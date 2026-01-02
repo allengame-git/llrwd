@@ -134,12 +134,269 @@ const InputDialog = ({
     );
 };
 
+// Link Dialog Component
+const LinkDialog = ({
+    isOpen,
+    onConfirm,
+    onCancel
+}: {
+    isOpen: boolean;
+    onConfirm: (text: string, url: string) => void;
+    onCancel: () => void;
+}) => {
+    const [text, setText] = useState('');
+    const [url, setUrl] = useState('');
+
+    if (!isOpen) return null;
+
+    const handleConfirm = () => {
+        if (url.trim()) {
+            onConfirm(text.trim() || url, url.trim());
+            setText('');
+            setUrl('');
+        } else {
+            alert('請輸入有效的 URL');
+        }
+    };
+
+    return (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 100000
+        }} onClick={(e) => { e.stopPropagation(); onCancel(); }}>
+            <div style={{
+                backgroundColor: 'var(--color-bg-surface, #fff)',
+                padding: '1.5rem',
+                borderRadius: 'var(--radius-md, 8px)',
+                minWidth: '400px',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+                color: 'var(--color-text-main, #333)'
+            }} onClick={(e) => e.stopPropagation()}>
+                <h4 style={{ marginBottom: '1rem', fontWeight: 600 }}>Insert Link</h4>
+
+                <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                        顯示文字 (Display Text)
+                    </label>
+                    <input
+                        type="text"
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        placeholder="點擊這裡"
+                        autoFocus
+                        style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '1px solid var(--color-border, #ccc)',
+                            borderRadius: 'var(--radius-sm, 4px)',
+                            fontSize: '1rem',
+                            background: 'var(--color-bg-surface, #fff)',
+                            color: 'var(--color-text-main, #333)'
+                        }}
+                    />
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                        連結 URL (Link URL)
+                    </label>
+                    <input
+                        type="url"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="https://example.com"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                handleConfirm();
+                            } else if (e.key === 'Escape') {
+                                onCancel();
+                            }
+                        }}
+                        style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '1px solid var(--color-border, #ccc)',
+                            borderRadius: 'var(--radius-sm, 4px)',
+                            fontSize: '1rem',
+                            background: 'var(--color-bg-surface, #fff)',
+                            color: 'var(--color-text-main, #333)'
+                        }}
+                    />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            border: '1px solid var(--color-border, #ccc)',
+                            borderRadius: 'var(--radius-sm, 4px)',
+                            background: 'transparent',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleConfirm}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            border: 'none',
+                            borderRadius: 'var(--radius-sm, 4px)',
+                            background: 'var(--color-primary, #3b82f6)',
+                            color: '#fff',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Insert
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Table Size Dialog Component
+const TableSizeDialog = ({
+    isOpen,
+    onConfirm,
+    onCancel
+}: {
+    isOpen: boolean;
+    onConfirm: (rows: number, cols: number) => void;
+    onCancel: () => void;
+}) => {
+    const [rows, setRows] = useState('3');
+    const [cols, setCols] = useState('3');
+
+    if (!isOpen) return null;
+
+    const handleConfirm = () => {
+        const rowsNum = parseInt(rows);
+        const colsNum = parseInt(cols);
+
+        if (rowsNum > 0 && rowsNum <= 20 && colsNum > 0 && colsNum <= 20) {
+            onConfirm(rowsNum, colsNum);
+        } else {
+            alert('請輸入 1-20 之間的數字');
+        }
+    };
+
+    return (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 100000
+        }} onClick={(e) => { e.stopPropagation(); onCancel(); }}>
+            <div style={{
+                backgroundColor: 'var(--color-bg-surface, #fff)',
+                padding: '1.5rem',
+                borderRadius: 'var(--radius-md, 8px)',
+                minWidth: '350px',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
+            }} onClick={(e) => e.stopPropagation()}>
+                <h4 style={{ marginBottom: '1rem', fontWeight: 600 }}>Insert Table</h4>
+
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                            行數 (Rows)
+                        </label>
+                        <input
+                            type="number"
+                            value={rows}
+                            onChange={(e) => setRows(e.target.value)}
+                            min="1"
+                            max="20"
+                            autoFocus
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                border: '1px solid var(--color-border, #ccc)',
+                                borderRadius: 'var(--radius-sm, 4px)',
+                                fontSize: '1rem',
+                                background: 'var(--color-bg-surface, #fff)',
+                                color: 'var(--color-text-main, #333)'
+                            }}
+                        />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                            列數 (Columns)
+                        </label>
+                        <input
+                            type="number"
+                            value={cols}
+                            onChange={(e) => setCols(e.target.value)}
+                            min="1"
+                            max="20"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleConfirm();
+                                } else if (e.key === 'Escape') {
+                                    onCancel();
+                                }
+                            }}
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                border: '1px solid var(--color-border, #ccc)',
+                                borderRadius: 'var(--radius-sm, 4px)',
+                                fontSize: '1rem',
+                                background: 'var(--color-bg-surface, #fff)',
+                                color: 'var(--color-text-main, #333)'
+                            }}
+                        />
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            border: '1px solid var(--color-border, #ccc)',
+                            borderRadius: 'var(--radius-sm, 4px)',
+                            background: 'transparent',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleConfirm}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            border: 'none',
+                            borderRadius: 'var(--radius-sm, 4px)',
+                            background: 'var(--color-primary, #3b82f6)',
+                            color: '#fff',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Insert
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const MenuBar = ({ editor, onUploadImage }: { editor: any; onUploadImage: (file: File) => void }) => {
     const [dialogState, setDialogState] = useState<{
         isOpen: boolean;
-        type: 'link' | 'image' | null;
+        type: 'image' | 'table' | null;
         defaultValue?: string;
     }>({ isOpen: false, type: null });
+
+    const [linkDialogOpen, setLinkDialogOpen] = useState(false);
 
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -157,8 +414,13 @@ const MenuBar = ({ editor, onUploadImage }: { editor: any; onUploadImage: (file:
     const openLinkDialog = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        const previousUrl = editor.getAttributes('link').href || '';
-        setDialogState({ isOpen: true, type: 'link', defaultValue: previousUrl });
+        setLinkDialogOpen(true);
+    };
+
+    const openTableDialog = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDialogState({ isOpen: true, type: 'table' });
     };
 
     const handleDialogConfirm = (value: string) => {
@@ -166,14 +428,17 @@ const MenuBar = ({ editor, onUploadImage }: { editor: any; onUploadImage: (file:
             if (value) {
                 editor.chain().focus().setImage({ src: value }).run();
             }
-        } else if (dialogState.type === 'link') {
-            if (value === '') {
-                editor.chain().focus().extendMarkRange('link').unsetLink().run();
-            } else {
-                editor.chain().focus().extendMarkRange('link').setLink({ href: value }).run();
-            }
         }
         setDialogState({ isOpen: false, type: null });
+    };
+
+    const handleLinkConfirm = (text: string, url: string) => {
+        editor.chain().focus().insertContent({
+            type: 'text',
+            text: text,
+            marks: [{ type: 'link', attrs: { href: url } }]
+        }).run();
+        setLinkDialogOpen(false);
     };
 
     const handleDialogCancel = () => {
@@ -284,7 +549,7 @@ const MenuBar = ({ editor, onUploadImage }: { editor: any; onUploadImage: (file:
 
                 <div style={{ width: '1px', background: 'var(--color-border)', margin: '0 0.5rem', height: '20px' }}></div>
 
-                <button onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} type="button">
+                <button onClick={openTableDialog} type="button">
                     Table
                 </button>
                 <button onClick={() => editor.chain().focus().deleteTable().run()} disabled={!editor.can().deleteTable()} type="button">
@@ -317,11 +582,24 @@ const MenuBar = ({ editor, onUploadImage }: { editor: any; onUploadImage: (file:
             </div>
 
             <InputDialog
-                isOpen={dialogState.isOpen}
-                title={dialogState.type === 'image' ? 'Insert Image URL' : 'Insert Link URL'}
+                isOpen={dialogState.isOpen && dialogState.type === 'image'}
+                title="Insert Image URL"
                 placeholder="https://..."
                 defaultValue={dialogState.defaultValue}
                 onConfirm={handleDialogConfirm}
+                onCancel={handleDialogCancel}
+            />
+            <LinkDialog
+                isOpen={linkDialogOpen}
+                onConfirm={handleLinkConfirm}
+                onCancel={() => setLinkDialogOpen(false)}
+            />
+            <TableSizeDialog
+                isOpen={dialogState.isOpen && dialogState.type === 'table'}
+                onConfirm={(rows, cols) => {
+                    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+                    setDialogState({ isOpen: false, type: null });
+                }}
                 onCancel={handleDialogCancel}
             />
         </>

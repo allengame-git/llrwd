@@ -1,6 +1,6 @@
 # 技術文件 - 專案項目資訊管理系統 (tech.md)
 
-> 最後更新: 2025-12-30
+>> 最後更新: 2026-01-02
 
 ## 專案資訊
 
@@ -186,6 +186,212 @@ relatedToItems  Item[] @relation("ItemRelations")
 - `handlePaste`: 攔截剪貼簿圖片，自動上傳
 - `handleDrop`: 攔截拖放圖片，自動上傳
 - 上傳按鈕: 選擇檔案後直接上傳
+- **自定義表格**: 實作 `TableSizeDialog` 元件，允許使用者在插入表格前設定行數與列數 (1-20)。
+- **Link 優化**: 實作 `LinkDialog` 元件，支援同時輸入顯示文字與 URL，改善原本需先選取文字的流程。
+- **導覽選單優化**:
+  - **摺疊功能**: `ItemTree` 支援 `isExpanded` 狀態，點擊箭頭圖示可切換展開/折疊。
+  - **當前項目高亮**: 透過 `currentItemId` Prop 識別目前頁面項目，並套用 `var(--color-primary-soft)` 背景與側邊邊框。
+
+### 4.5 Approval Dashboard 優化
+
+**功能增強**:
+
+- **UPDATE 請求詳情**: 顯示項目編號 (`item.fullId`)、當前標題、提交人名稱
+- **自我審核防呆**: 非 ADMIN 角色無法審核自己提交的申請
+- **Dashboard UI 重新設計**:
+  - Grid 卡片式佈局 (responsive, `minmax(320px, 1fr)`)
+  - 每張卡片顯示摘要資訊（類型、標題、專案、提交人、日期）
+  - 點擊展開顯示完整詳情面板
+  - 視覺回饋（邊框高亮、陰影、縮放效果）
+  - Approve/Reject 按鈕僅在展開狀態顯示
+
+**實作細節**:
+
+```typescript
+// Self-approval prevention in approveRequest()
+if (session.user.role !== "ADMIN" && request.submittedById === session.user.id) {
+    throw new Error("You cannot approve your own change request");
+}
+```
+
+### 4.6 Project Management 機制
+
+**核心功能**:
+
+- **Project Edit Flow**:
+  - 使用 `submitUpdateProjectRequest` Server Action
+  - 產生 `PROJECT_UPDATE` 類型 ChangeRequest
+  - 針對 `Project` 模型進行更新 (Title, Description)
+  - 權限: EDITOR, INSPECTOR, ADMIN
+- **Project Delete Flow**:
+  - 使用 `submitDeleteProjectRequest` Server Action
+  - 產生 `PROJECT_DELETE` 類型 ChangeRequest
+  - 權限: ADMIN Only
+  - **安全檢查**: 提交與執行時皆檢查 `project._count.items > 0`，防止刪除非空專案
+
+**資料庫 Schema**:
+
+原有 `ChangeRequest` 模型即可支援，僅需擴充 `type` 列舉值與邏輯處理：
+
+```prisma
+model ChangeRequest {
+  type String // 新增: "PROJECT_UPDATE", "PROJECT_DELETE"
+  // ...
+  targetProjectId Int? // 用於指定目標專案
+}
+```
+
+---
+
+### 4.7 Item History & Global Dashboard
+
+**核心功能**:
+
+- **Item History**: 記錄所有變更 (CREATE, UPDATE, DELETE)
+- **Snapshot Strategy**: 每次變更儲存完整快照 (Snapshot)，便於獨立還原
+- **Data Redundancy**: 針對已刪除項目，儲存 `itemFullId`, `itemTitle`, `projectId` 等欄位，確保項目被硬刪除後仍可查詢歷史
+
+**Database Schema**:
+
+```prisma
+model ItemHistory {
+  id              Int      @id @default(autoincrement())
+  itemId          Int?     // 可為 null (當 Item 被硬刪除時)
+  version         Int
+  changeType      String   // CREATE, UPDATE, DELETE
+  snapshot        String   // JSON string of full item state
+  diff            String?  // JSON string of changes
+  
+  // Redundant fields for deleted items
+  itemFullId      String?
+  itemTitle       String?
+  projectId       Int?
+}
+```
+
+**Global Dashboard UI**:
+
+- **三層式結構**: Project List -> Project Tree -> History List
+- **Progressive Disclosure**: 逐步揭露資訊，避免一次載入過多資料
+- **Diff Rendering**: 後端計算差異，前端渲染 Rich Text 內容 (支援 HTML Diff)
+- **權限**: 開放給所有登入使用者瀏覽，確保資訊透明
+
+**前端實現**:
+
+- **HistorySidebar**: 顯示專案內所有項目 (包含已刪除)，支援搜尋
+- **Rich Text Diff**: 針對 `content` 欄位，使用 `dangerouslySetInnerHTML` 渲染 HTML 差異，並還原 `ATTACHMENTS` 連結
+
+### 4.8 專案搜尋功能
+
+**核心功能**:
+
+- **全文搜尋**: 在指定專案內搜尋 Title 與 Content
+- **HTML/JSON 過濾**: 避免搜尋結果包含 HTML 標籤或 JSON 語法的匹配
+- **關鍵字高亮**: 搜尋結果中高亮顯示匹配的關鍵字
+
+**技術實作**:
+
+檔案: `src/actions/search.ts`, `src/lib/search-utils.ts`
+
+```typescript
+// 1. 資料庫查詢 (模糊搜尋)
+const items = await prisma.item.findMany({
+  where: {
+    projectId,
+    OR: [
+      { title: { contains: query } },
+      { content: { contains: query } }
+    ]
+  }
+});
+
+// 2. 過濾 HTML 標籤內容
+const filteredItems = items.filter(item => {
+  const plainContent = stripHtmlTags(item.content);
+  const searchableText = `${item.title}\n\n${plainContent}`;
+  return searchableText.toLowerCase().includes(query.toLowerCase());
+});
+
+// 3. 生成搜尋片段與高亮
+function generateSnippets(text: string, query: string) {
+  // 找出匹配位置，擷取前後文本
+  // 使用 <mark> 標籤高亮顯示
+}
+```
+
+**前端頁面**: `/projects/[id]/search?q=keyword`
+
+- 使用 `SearchResults` 元件顯示結果
+- 卡片式佈局，可點擊跳轉至項目詳情頁
+
+### 4.9 UI 對話框優化與自我審核防止
+
+**問題記錄**:
+
+| 問題 | 原因 | 解決方案 |
+|------|------|----------|
+| 刪除對話框閃現 | `window.confirm()` 與 React 狀態衝突 | 改用 React 自訂對話框 + state 管理 |
+| Approval 對話框閃現 | `alert()` 阻塞式對話框 | 改用 React 自訂 errorDialog 元件 |
+
+**統一 Dialog 設計**:
+
+所有對話框統一採用 glass modal 設計：
+
+```typescript
+const dialogStyle = {
+  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  backdropFilter: 'blur(8px)',
+  // ...
+};
+
+const contentStyle = {
+  className: "glass",
+  backgroundColor: 'var(--color-bg-surface)',
+  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+  border: '1px solid var(--color-border)',
+  // ...
+};
+```
+
+**自我審核防止機制**:
+
+檔案: `src/components/approval/ApprovalList.tsx`, `src/app/admin/approval/page.tsx`
+
+```typescript
+// 1. 視覺標注
+{req.submittedBy.username === currentUsername && (
+  <div style={{ 
+    backgroundColor: "var(--color-warning-soft)",
+    color: "var(--color-warning)"
+  }}>
+    ⚠️ 您提交的申請
+  </div>
+)}
+
+// 2. 邊框與背景警示
+border: req.submittedBy.username === currentUsername
+  ? "2px solid var(--color-warning)"
+  : "2px solid transparent",
+backgroundColor: req.submittedBy.username === currentUsername
+  ? "rgba(234, 179, 8, 0.05)"
+  : undefined
+
+// 3. 操作攔截
+const handleApproveClick = (e, id) => {
+  const request = requests.find(r => r.id === id);
+  if (request && request.submittedBy.username === currentUsername) {
+    setErrorDialog('您不能批准自己提交的申請。請由其他審核人員處理。');
+    return;
+  }
+  setConfirmDialog({ id, action: 'approve' });
+};
+```
+
+**錯誤對話框**:
+
+- 標題: 「權限受限」(紅色)
+- 內容: 友善的錯誤訊息
+- 只有「確定」按鈕關閉
 
 ---
 
@@ -199,7 +405,9 @@ relatedToItems  Item[] @relation("ItemRelations")
 | 日期格式不一致 | 使用固定 locale |
 | Prisma 類型未更新 | `npx prisma generate` + 重啟 |
 | confirm() 對話框閃現 | 改用 React 自訂對話框 |
+| alert() 對話框閃現 | 改用 React errorDialog state |
 | Server Component Prisma 錯誤 | 移除 `"use client"` |
+| 搜尋結果包含 HTML 標籤 | 過濾 HTML 後再比對 |
 
 ### 詳細記錄
 

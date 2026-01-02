@@ -1,8 +1,13 @@
 # 功能實作計畫 (implementation_plan.md)
 
-> 最後更新: 2025-12-30
+> 最後更新: 2026-01-02
 
 本文件記錄各功能的需求分析與技術設計。
+
+## 最新更新
+
+- **Phase 4.8**: 專案搜尋功能 ✅ 已完成 (2026-01-02)
+- **Phase 4.9**: UI 對話框優化與自我審核防止 ✅ 已完成 (2026-01-02)
 
 ---
 
@@ -14,6 +19,7 @@
 4. [使用者權限管理](#4-使用者權限管理-user-management)
 5. [項目編輯刪除流程](#5-項目編輯刪除流程-item-editdelete)
 6. [Rich Text Editor 圖片功能](#6-rich-text-editor-圖片功能)
+7. [Approval Dashboard 優化](#7-approval-dashboard-優化)
 
 ---
 
@@ -163,6 +169,10 @@ if (childCount > 0) {
 | 貼上 | `handlePaste` 攔截剪貼簿圖片 |
 | 拖放 | `handleDrop` 攔截拖放事件 |
 | 上傳 | 呼叫 `/api/upload` 後插入 URL |
+| 自定義表格 | `TableSizeDialog` 元件實作 (支援 1x1 ~ 20x20) |
+| Link 優化 | `LinkDialog` 元件實作 (支援同時輸入文字與 URL) |
+| 選單摺疊 | `ItemTree` 狀態管理 (展開/折疊) |
+| 選單高亮 | `currentItemId` PropTypes 與樣式套用 |
 
 ### 問題解決
 
@@ -171,6 +181,78 @@ if (childCount > 0) {
 | window.prompt() 閃退 | 改用 React InputDialog |
 | Modal 被遮擋 | createPortal 至 body |
 | 背景透明 | 使用正確 CSS 變數 |
+
+### 狀態: ✅ 已完成 (含表格、Link 與導覽選單優化)
+
+---
+
+## 7. Approval Dashboard 優化
+
+### 需求
+
+改善審核流程的使用者體驗與資訊完整性。
+
+### 功能增強
+
+| 功能 | 說明 |
+|------|------|
+| UPDATE 請求詳情 | 顯示項目編號、當前標題、提交人 |
+| 自我審核防呆 | 非 ADMIN 無法審核自己的申請 |
+| Dashboard UI | Grid 卡片式佈局、點擊展開詳情 |
+
+### 技術實作
+
+**自我審核防呆**:
+
+```typescript
+// In approveRequest()
+if (session.user.role !== "ADMIN" && request.submittedById === session.user.id) {
+    throw new Error("You cannot approve your own change request");
+}
+```
+
+**Dashboard UI 設計**:
+
+- Grid 響應式佈局 (`minmax(320px, 1fr)`)
+- 卡片顯示摘要資訊（類型、標題、專案、提交人、日期）
+- 點擊展開/收合功能
+- 展開時顯示完整詳情面板
+- 視覺回饋（邊框、陰影、縮放）
+- Approve/Reject 按鈕僅在展開狀態顯示
+
+### 狀態: ✅ 已完成
+
+---
+
+## 8. 專案管理機制優化
+
+> Status: ✅ Done (v0.6.0)
+
+### 需求分析
+
+- 專案資料需要經過審核流程才能修改或刪除 (Project Governance)
+- 權限控管需求：
+  - 編輯：EDITOR, INSPECTOR, ADMIN
+  - 刪除：ADMIN Only
+- 安全防護：
+  - 已有 Items 的專案不可刪除
+  - 刪除需二次確認
+
+### 技術實作
+
+**New ChangeRequest Types**:
+
+- `PROJECT_UPDATE`: 用於修改專案標題與描述
+- `PROJECT_DELETE`: 用於刪除專案
+
+**Approval Flow**:
+
+1. User 點擊 Edit/Delete 按鈕 (前端權限檢查)
+2. 填寫表單/確認對話框
+3. 呼叫 Server Action (`submitUpdateProjectRequest` / `submitDeleteProjectRequest`)
+4. 建立 ChangeRequest (Status: PENDING)
+5. Admin/Inspector 在 Approval Dashboard 審核
+6. 審核通過 -> 更新/刪除 `Project` 資料
 
 ### 狀態: ✅ 已完成
 
@@ -184,3 +266,34 @@ if (childCount > 0) {
 - [ ] 全系統整合測試
 - [ ] 使用說明文件 (Walkthrough)
 - [ ] 效能優化
+
+---
+
+## 9. Item History & Global Dashboard
+
+> Status: ✅ Done (v0.7.0)
+
+### 需求分析
+
+- 記錄 Item 的完整變更歷史 (Versions)
+- 支援還原或查看變更前狀態 (Diff)
+- 管理員可查看全域變更歷史，包含已刪除的 Item
+
+### 技術實作
+
+**Schema**:
+
+- `ItemHistory`: 儲存 `snapshot` (完整 JSON) 與 `diff` (變更差異)
+- Redundant Data: `itemFullId`, `itemTitle` 儲存於 History 以支援刪除後查詢
+
+**API**:
+
+- `createHistoryRecord`: 在 `approveRequest` 時觸發
+- `getItemHistory`: 查詢單一項目歷史
+- `getGlobalHistory`: 查詢全域歷史 (分頁/搜尋)
+
+**UI**:
+
+- Item Detail 頁面底部顯示近期變更
+- 獨立 History Detail 頁面顯示 Snapshot 與 Diff
+- Global Dashboard 採用三層式導覽 (Project -> Tree -> List)

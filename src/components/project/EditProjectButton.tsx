@@ -2,41 +2,24 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import RichTextEditor from "../editor/RichTextEditor";
-import { submitUpdateItemRequest } from "@/actions/approval";
-import FileUploader from "../upload/FileUploader";
-import RelatedItemsManager from "./RelatedItemsManager";
+import { submitUpdateProjectRequest } from "@/actions/approval";
 
-interface RelatedItem {
-    id: number;
-    fullId: string;
-    title: string;
-    projectId: number;
-}
-
-interface EditItemButtonProps {
-    item: {
+interface EditProjectButtonProps {
+    project: {
         id: number;
         title: string;
-        content: string | null;
-        attachments: string | null;
-        relatedItems?: RelatedItem[];
+        description: string | null;
     };
-    isDisabled?: boolean;
 }
 
-export default function EditItemButton({ item, isDisabled = false }: EditItemButtonProps) {
+export default function EditProjectButton({ project }: EditProjectButtonProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [title, setTitle] = useState(item.title);
-    const [content, setContent] = useState(item.content || "");
-    const [attachments, setAttachments] = useState<any[]>(
-        item.attachments ? JSON.parse(item.attachments) : []
-    );
-    const [relatedItems, setRelatedItems] = useState<RelatedItem[]>(item.relatedItems || []);
+    const [title, setTitle] = useState(project.title);
+    const [description, setDescription] = useState(project.description || "");
     const [status, setStatus] = useState<{ message?: string; error?: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Initial load check for document (SSR safety)
+    // SSR safety
     const [mounted, setMounted] = useState(false);
     useEffect(() => {
         setMounted(true);
@@ -45,13 +28,11 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
     // Reset form when modal opens
     useEffect(() => {
         if (isModalOpen) {
-            setTitle(item.title);
-            setContent(item.content || "");
-            setAttachments(item.attachments ? JSON.parse(item.attachments) : []);
-            setRelatedItems(item.relatedItems || []);
+            setTitle(project.title);
+            setDescription(project.description || "");
             setStatus(null);
         }
-    }, [isModalOpen, item]);
+    }, [isModalOpen, project]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -59,20 +40,12 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
         setStatus(null);
 
         const formData = new FormData();
-        formData.append("itemId", item.id.toString());
+        formData.append("projectId", project.id.toString());
         formData.append("title", title);
-        formData.append("content", content);
-
-        if (attachments.length > 0) {
-            formData.append("attachments", JSON.stringify(attachments));
-        }
-
-        if (relatedItems.length > 0) {
-            formData.append("relatedItems", JSON.stringify(relatedItems));
-        }
+        formData.append("description", description);
 
         try {
-            const result = await submitUpdateItemRequest({}, formData);
+            const result = await submitUpdateProjectRequest({}, formData);
             if (result.error) {
                 setStatus({ error: result.error });
             } else {
@@ -80,6 +53,7 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
                 setTimeout(() => {
                     setIsModalOpen(false);
                     setStatus(null);
+                    window.location.reload();
                 }, 1500);
             }
         } catch (err) {
@@ -94,19 +68,19 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: "rgba(0,0,0,0.6)",
             display: "flex", justifyContent: "center", alignItems: "center",
-            zIndex: 99999, // Extremely high z-index
+            zIndex: 99999,
             backdropFilter: "blur(4px)"
         }}>
             <div className="glass" style={{
-                width: "900px", maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto",
+                width: "600px", maxWidth: "95vw",
                 borderRadius: "var(--radius-lg)", padding: "2rem",
                 display: "flex", flexDirection: "column",
-                backgroundColor: "var(--color-bg-surface)", // Solid background
+                backgroundColor: "var(--color-bg-surface)",
                 boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
                 border: "1px solid var(--color-border)"
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: "1.5rem" }}>
-                    <h2 style={{ margin: 0 }}>Edit Item: {item.title}</h2>
+                    <h2 style={{ margin: 0 }}>Edit Project</h2>
                     <button
                         type="button"
                         onClick={() => setIsModalOpen(false)}
@@ -136,9 +110,9 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem", flex: 1 }}>
+                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                     <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Title</label>
+                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Project Title *</label>
                         <input
                             type="text"
                             required
@@ -146,37 +120,27 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
                             onChange={(e) => setTitle(e.target.value)}
                             style={{
                                 width: "100%", padding: "0.75rem", borderRadius: "var(--radius-sm)",
-                                border: "1px solid var(--color-border)", background: "var(--color-background)",
-                                color: "var(--color-text)"
+                                border: "1px solid var(--color-border)", background: "var(--color-bg-base)",
+                                color: "var(--color-text-main)"
                             }}
                         />
                     </div>
 
-                    <div style={{ flex: 1, minHeight: "300px", display: "flex", flexDirection: "column" }}>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Content</label>
-                        <div style={{
-                            flex: 1, border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
-                            overflow: "hidden", background: "white" // Force white background for editor visibility
-                        }}>
-                            <RichTextEditor content={content} onChange={setContent} />
-                        </div>
-                    </div>
-
                     <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Attachments</label>
-                        <FileUploader onFilesChange={setAttachments} initialFiles={attachments} />
-                    </div>
-
-                    {/* Related Items Section */}
-                    <div>
-                        <RelatedItemsManager
-                            initialRelatedItems={relatedItems}
-                            onChange={setRelatedItems}
-                            canEdit={true}
+                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Description</label>
+                        <textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            rows={4}
+                            style={{
+                                width: "100%", padding: "0.75rem", borderRadius: "var(--radius-sm)",
+                                border: "1px solid var(--color-border)", background: "var(--color-bg-base)",
+                                color: "var(--color-text-main)", resize: "vertical"
+                            }}
                         />
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem" }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "0.5rem" }}>
                         <button
                             type="button"
                             onClick={() => setIsModalOpen(false)}
@@ -201,11 +165,18 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
     return (
         <>
             <button
-                className="btn btn-outline"
-                onClick={() => setIsModalOpen(true)}
-                disabled={isDisabled}
-                title={isDisabled ? "Changes pending approval" : "Request changes"}
-                style={{ opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+                onClick={(e) => { e.stopPropagation(); setIsModalOpen(true); }}
+                style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--color-primary)",
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    padding: "0.25rem 0.5rem",
+                    borderRadius: "4px",
+                    transition: "all 0.2s"
+                }}
+                title="Edit Project"
             >
                 Edit
             </button>

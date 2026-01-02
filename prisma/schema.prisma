@@ -20,6 +20,9 @@ model User {
 
   submittedRequests ChangeRequest[] @relation("SubmittedBy")
   reviewedRequests  ChangeRequest[] @relation("ReviewedBy")
+  
+  submittedHistories ItemHistory[] @relation("HistorySubmitter")
+  reviewedHistories  ItemHistory[] @relation("HistoryReviewer")
 }
 
 model Project {
@@ -34,6 +37,8 @@ model Project {
 
   // Relations for ChangeRequests targeting this project (new root items)
   newRootItemRequests ChangeRequest[] @relation("TargetProject")
+  
+  itemHistories ItemHistory[]
 }
 
 model Item {
@@ -44,6 +49,7 @@ model Item {
   attachments String?  // JSON array: [{ name, path, size, type, uploadedAt }]
   publishedAt DateTime?
   isDeleted   Boolean  @default(false)
+  currentVersion Int   @default(1)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -65,6 +71,8 @@ model Item {
   // Related Items (Many-to-Many Self Relation)
   relatedItems    Item[] @relation("ItemRelations")
   relatedToItems  Item[] @relation("ItemRelations")
+  
+  history ItemHistory[]
 }
 
 model ChangeRequest {
@@ -95,4 +103,40 @@ model ChangeRequest {
   reviewNote    String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model ItemHistory {
+  id          Int      @id @default(autoincrement())
+  
+  // Optional relation to Item (can be null if Item is deleted)
+  itemId      Int?
+  item        Item?    @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  
+  version     Int
+  changeType  String   // "CREATE" | "UPDATE" | "DELETE" | "RESTORE"
+  
+  snapshot    String   // JSON
+  diff        String?  // JSON
+  
+  submittedById String
+  submittedBy   User   @relation("HistorySubmitter", fields: [submittedById], references: [id])
+  
+  reviewedById  String?
+  reviewedBy    User?  @relation("HistoryReviewer", fields: [reviewedById], references: [id])
+  
+  reviewStatus  String // "APPROVED" | "REJECTED" - usually APPROVED for committed history
+  reviewNote    String?
+  
+  changeRequestId Int?
+  
+  // Redundant fields for deleted items
+  itemFullId    String
+  itemTitle     String
+  projectId     Int
+  project       Project   @relation(fields: [projectId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([itemId, version])
+  @@index([itemId, createdAt])
 }

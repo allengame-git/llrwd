@@ -53,6 +53,13 @@ export default function Navbar() {
                             >
                                 Projects
                             </Link>
+                            <Link
+                                href="/admin/history"
+                                className={`btn btn-outline ${isActive("/admin/history") ? "active-link" : ""}`}
+                                style={{ border: "none", padding: "0.5rem 1rem" }}
+                            >
+                                History
+                            </Link>
                             {(session.user.role === "ADMIN" || session.user.role === "INSPECTOR") && (
                                 <Link
                                     href="/admin/approval"

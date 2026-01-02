@@ -1,4 +1,4 @@
-import { getPendingRequests, approveRequest, rejectRequest } from "@/actions/approval";
+import { getPendingRequests } from "@/actions/approval";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -18,7 +18,7 @@ export default async function ApprovalPage() {
     return (
         <div className="container" style={{ paddingBottom: "4rem" }}>
             <h1 style={{ marginBottom: "2rem" }}>Approval Dashboard</h1>
-            <ApprovalList requests={requests} />
+            <ApprovalList requests={requests} currentUsername={session.user.username} />
         </div>
     );
 }

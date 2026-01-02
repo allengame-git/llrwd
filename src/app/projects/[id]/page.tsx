@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { buildItemTree } from "@/lib/tree-utils";
 import ItemTree from "@/components/item/ItemTree";
+import ProjectSearch from "@/components/search/ProjectSearch";
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                 <h1 style={{ marginTop: "0.5rem" }}>{project.title} <span style={{ color: "var(--color-text-muted)", fontSize: "1.5rem" }}>({project.codePrefix})</span></h1>
                 <p style={{ color: "var(--color-text-muted)" }}>{project.description}</p>
             </div>
+
+            {/* Search functionality */}
+            <ProjectSearch projectId={projectId} />
 
             <div className="glass" style={{ padding: "2rem", borderRadius: "var(--radius-lg)", minHeight: "200px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>

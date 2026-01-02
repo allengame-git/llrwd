@@ -4,7 +4,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import RelatedItemsManager from "@/components/item/RelatedItemsManager";
 import { buildItemTree } from "@/lib/tree-utils";
 import ItemTree from "@/components/item/ItemTree";
 import EditItemButton from "@/components/item/EditItemButton";
@@ -27,7 +26,21 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                     id: true,
                     fullId: true,
                     title: true,
-                    projectId: true
+                    projectId: true,
+                    project: {
+                        select: {
+                            title: true,
+                            codePrefix: true
+                        }
+                    }
+                }
+            },
+            history: {
+                orderBy: { createdAt: 'desc' },
+                take: 10,
+                include: {
+                    submittedBy: { select: { username: true } },
+                    reviewedBy: { select: { username: true } }
                 }
             }
         }
@@ -77,7 +90,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                     borderRight: '1px solid var(--color-border)'
                 }}>
                     <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', color: 'var(--color-text-muted)' }}>Navigation</h3>
-                    <ItemTree nodes={rootNodes} projectId={item.projectId} canEdit={canEdit} />
+                    <ItemTree nodes={rootNodes} projectId={item.projectId} canEdit={canEdit} currentItemId={itemId} />
                 </div>
 
                 {/* Main Content */}
@@ -121,12 +134,83 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                         )}
                     </div>
 
-                    {/* Related Items Section */}
-                    <RelatedItemsManager
-                        sourceItemId={item.id}
-                        initialRelatedItems={item.relatedItems || []}
-                        canEdit={canEdit}
-                    />
+                    {/* Related Items Section (Read-only display) */}
+                    {item.relatedItems && item.relatedItems.length > 0 && (() => {
+                        // Group by project and sort
+                        type RelatedItemType = { id: number; fullId: string; title: string; projectId: number; project: { title: string; codePrefix: string } };
+                        const grouped = item.relatedItems.reduce((acc: Record<string, RelatedItemType[]>, ri: RelatedItemType) => {
+                            const key = ri.project.title;
+                            if (!acc[key]) acc[key] = [];
+                            acc[key].push(ri);
+                            return acc;
+                        }, {} as Record<string, RelatedItemType[]>);
+
+                        // Natural sort function for fullId (WQ-1, WQ-2, WQ-2-1, WQ-10)
+                        const naturalSort = (a: string, b: string) => {
+                            const aParts = a.split('-').map(p => isNaN(Number(p)) ? p : Number(p));
+                            const bParts = b.split('-').map(p => isNaN(Number(p)) ? p : Number(p));
+                            for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+                                const aVal = aParts[i] ?? '';
+                                const bVal = bParts[i] ?? '';
+                                if (aVal < bVal) return -1;
+                                if (aVal > bVal) return 1;
+                            }
+                            return 0;
+                        };
+
+                        // Sort items within each group
+                        Object.values(grouped).forEach((items: RelatedItemType[]) => {
+                            items.sort((a, b) => naturalSort(a.fullId, b.fullId));
+                        });
+
+                        // Sort project groups alphabetically
+                        const sortedProjects = Object.keys(grouped).sort();
+
+                        return (
+                            <div className="glass" style={{ padding: "2rem", borderRadius: "var(--radius-lg)", marginTop: "2rem" }}>
+                                <h3 style={{ marginBottom: "1rem", fontSize: "1.2rem" }}>Related Items</h3>
+                                {sortedProjects.map((projectTitle) => (
+                                    <div key={projectTitle} style={{ marginBottom: "1.5rem" }}>
+                                        <div style={{
+                                            fontSize: "0.85rem",
+                                            fontWeight: 600,
+                                            color: "var(--color-text-muted)",
+                                            marginBottom: "0.5rem",
+                                            paddingBottom: "0.25rem",
+                                            borderBottom: "1px solid var(--color-border)"
+                                        }}>
+                                            📁 {projectTitle}
+                                        </div>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                            {grouped[projectTitle].map((related: RelatedItemType) => (
+                                                <a
+                                                    key={related.id}
+                                                    href={`/items/${related.id}`}
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "1rem",
+                                                        padding: "0.75rem",
+                                                        backgroundColor: "rgba(0,0,0,0.02)",
+                                                        borderRadius: "var(--radius-sm)",
+                                                        border: "1px solid var(--color-border)",
+                                                        textDecoration: "none",
+                                                        color: "inherit",
+                                                        transition: "all 0.2s"
+                                                    }}
+                                                >
+                                                    <span style={{ fontWeight: "bold", fontFamily: "var(--font-geist-mono)", color: "var(--color-primary)" }}>
+                                                        {related.fullId}
+                                                    </span>
+                                                    <span>{related.title}</span>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })()}
 
                     {/* Attachments Section */}
                     {item.attachments && JSON.parse(item.attachments).length > 0 && (
@@ -162,6 +246,58 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                                         <span style={{ color: "var(--color-primary)" }}>下載 ↓</span>
                                     </a>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* History Section */}
+                    {item.history && item.history.length > 0 && (
+                        <div className="glass" style={{ padding: "2rem", borderRadius: "var(--radius-lg)", marginTop: "2rem" }}>
+                            <h3 style={{ marginBottom: "1rem", fontSize: "1.2rem" }}>變更歷史 (最近 10 筆)</h3>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
+                                            <th style={{ padding: '0.75rem', color: 'var(--color-text-muted)' }}>版本</th>
+                                            <th style={{ padding: '0.75rem', color: 'var(--color-text-muted)' }}>日期</th>
+                                            <th style={{ padding: '0.75rem', color: 'var(--color-text-muted)' }}>類型</th>
+                                            <th style={{ padding: '0.75rem', color: 'var(--color-text-muted)' }}>提交者</th>
+                                            <th style={{ padding: '0.75rem', color: 'var(--color-text-muted)' }}>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {item.history.map((record) => (
+                                            <tr key={record.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                                <td style={{ padding: '0.75rem', fontFamily: 'var(--font-geist-mono)' }}>v{record.version}</td>
+                                                <td style={{ padding: '0.75rem' }}>{new Date(record.createdAt).toLocaleString()}</td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <span style={{
+                                                        padding: '0.2rem 0.6rem',
+                                                        borderRadius: '1rem',
+                                                        fontSize: '0.8rem',
+                                                        backgroundColor: record.changeType === 'CREATE' ? 'var(--color-success-bg)' :
+                                                            record.changeType === 'UPDATE' ? 'var(--color-info-bg)' :
+                                                                record.changeType === 'DELETE' ? 'var(--color-error-bg)' : 'var(--color-bg-secondary)',
+                                                        color: record.changeType === 'CREATE' ? 'var(--color-success)' :
+                                                            record.changeType === 'UPDATE' ? 'var(--color-info)' :
+                                                                record.changeType === 'DELETE' ? 'var(--color-error)' : 'var(--color-text)',
+                                                    }}>
+                                                        {record.changeType}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '0.75rem' }}>{record.submittedBy.username}</td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <Link
+                                                        href={`/admin/history/detail/${record.id}`} // Or item specific URL?
+                                                        style={{ color: 'var(--color-primary)', textDecoration: 'none' }}
+                                                    >
+                                                        查看詳情
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}

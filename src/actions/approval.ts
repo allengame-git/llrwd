@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { generateNextItemId } from "@/lib/item-utils";
+import { createHistoryRecord, ItemSnapshot } from "./history";
 
 export type ApprovalState = {
     message?: string;
@@ -75,6 +76,8 @@ export async function submitUpdateItemRequest(
     const content = formData.get("content") as string;
     const attachmentsStr = formData.get("attachments") as string;
     const attachments = attachmentsStr ? JSON.parse(attachmentsStr) : null;
+    const relatedItemsStr = formData.get("relatedItems") as string;
+    const relatedItems = relatedItemsStr ? JSON.parse(relatedItemsStr) : null;
 
     if (!itemId || !title) {
         return { error: "Missing required fields" };
@@ -84,7 +87,7 @@ export async function submitUpdateItemRequest(
     const item = await prisma.item.findUnique({ where: { id: itemId } });
     if (!item) return { error: "Item not found" };
 
-    const data = JSON.stringify({ title, content, attachments });
+    const data = JSON.stringify({ title, content, attachments, relatedItems });
 
     try {
         await prisma.changeRequest.create({
@@ -145,6 +148,91 @@ export async function submitDeleteItemRequest(itemId: number): Promise<ApprovalS
     }
 }
 
+// --- Submit Project Update Request ---
+export async function submitUpdateProjectRequest(
+    prevState: ApprovalState,
+    formData: FormData
+): Promise<ApprovalState> {
+    const session = await getServerSession(authOptions);
+    if (!session || (session.user.role !== "EDITOR" && session.user.role !== "INSPECTOR" && session.user.role !== "ADMIN")) {
+        return { error: "Unauthorized" };
+    }
+
+    const projectId = parseInt(formData.get("projectId") as string);
+    const title = formData.get("title") as string;
+    const description = formData.get("description") as string;
+
+    if (!projectId || !title) {
+        return { error: "Missing required fields" };
+    }
+
+    // Check if project exists
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return { error: "Project not found" };
+
+    const data = JSON.stringify({ title, description });
+
+    try {
+        await prisma.changeRequest.create({
+            data: {
+                type: "PROJECT_UPDATE",
+                status: "PENDING",
+                data,
+                targetProjectId: projectId,
+                submittedById: session.user.id,
+            },
+        });
+
+        revalidatePath(`/projects`);
+        revalidatePath(`/projects/${projectId}`);
+        return { message: "Project update request submitted successfully! Waiting for approval." };
+    } catch (e) {
+        console.error(e);
+        return { error: "Failed to submit request" };
+    }
+}
+
+// --- Submit Project Delete Request ---
+export async function submitDeleteProjectRequest(projectId: number): Promise<ApprovalState> {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "ADMIN") {
+        return { error: "Unauthorized: Only Admins can request project deletion." };
+    }
+
+    // Check if project exists
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: { _count: { select: { items: true } } }
+    });
+    if (!project) return { error: "Project not found" };
+
+    // Check if project has items
+    if (project._count.items > 0) {
+        return { error: `Cannot delete project with ${project._count.items} existing items. Please delete all items first.` };
+    }
+
+    // Store project info in data for display in approval dashboard
+    const data = JSON.stringify({ title: project.title, codePrefix: project.codePrefix });
+
+    try {
+        await prisma.changeRequest.create({
+            data: {
+                type: "PROJECT_DELETE",
+                status: "PENDING",
+                data,
+                targetProjectId: projectId,
+                submittedById: session.user.id,
+            },
+        });
+
+        revalidatePath(`/projects`);
+        return { message: "Project delete request submitted successfully! Waiting for approval." };
+    } catch (e) {
+        console.error(e);
+        return { error: "Failed to submit request" };
+    }
+}
+
 // --- Admin Actions ---
 
 export async function getPendingRequests() {
@@ -157,7 +245,17 @@ export async function getPendingRequests() {
             submittedBy: { select: { username: true } },
             targetProject: { select: { title: true, codePrefix: true } },
             targetParent: { select: { fullId: true } },
-            item: { select: { fullId: true, title: true } } // For Update/Delete
+            item: {
+                select: {
+                    fullId: true,
+                    title: true,
+                    content: true,
+                    attachments: true,
+                    relatedItems: {
+                        select: { id: true, fullId: true, title: true }
+                    }
+                }
+            }
         },
         orderBy: { createdAt: "asc" }
     });
@@ -169,9 +267,17 @@ export async function approveRequest(requestId: number) {
 
     const request = await prisma.changeRequest.findUnique({
         where: { id: requestId },
+        include: {
+            submittedBy: { select: { id: true } }
+        }
     });
 
     if (!request || request.status !== "PENDING") throw new Error("Invalid request");
+
+    // Prevent self-approval (except for ADMIN)
+    if (session.user.role !== "ADMIN" && request.submittedById === session.user.id) {
+        throw new Error("You cannot approve your own change request");
+    }
 
     const data = JSON.parse(request.data);
 
@@ -186,7 +292,8 @@ export async function approveRequest(requestId: number) {
                 request.targetParentId
             );
 
-            await prisma.item.create({
+            // Capture the created item
+            const newItem = await prisma.item.create({
                 data: {
                     fullId,
                     title: data.title,
@@ -198,47 +305,52 @@ export async function approveRequest(requestId: number) {
                     parentId: request.targetParentId,
                     publishedAt: new Date(), // Publish immediately upon approval for now
                     relatedItems: data.relatedItems && data.relatedItems.length > 0 ? {
-                        connect: data.relatedItems.map((item: any) => ({ id: item.id }))
+                        connect: data.relatedItems.map((item: { id: number }) => ({ id: item.id }))
                     } : undefined
-                }
+                },
+                include: { relatedItems: { select: { id: true, fullId: true } } }
             });
 
             // Bidirectional Relation Sync for new item
-            // Since we only connected one way above (New -> Related), we should also connect Related -> New?
-            // Wait, implicit m-n table logic:
-            // If we connect A -> B, the relation exists in the join table.
-            // B.relatedItems will include A? Not necessarily. 
-            // In Prisma explicit relation with @relation("name"), there are two fields.
-            // If I connect A.relatedItems to B, then A is in B.relatedToItems.
-            // But we want A in B.relatedItems too (symmetric).
-            // So we need to manually update the other side.
-
             if (data.relatedItems && data.relatedItems.length > 0) {
-                // Update the other items to also related to this new item
-                // We can't do this in the same create call easily for symmetric self-relation logic unless we just rely on one relation field.
-                // But our schema has two fields relatedItems/relatedToItems.
-                // Let's manually iterate to sure symmetry.
-                // The item we just created has `fullId`.
-
-                // However, we don't have the new item's internal ID easily unless we capture the return of creation.
-                const newItem = await prisma.item.findUnique({ where: { fullId } });
-
-                if (newItem) {
-                    for (const rItem of data.relatedItems) {
-                        await prisma.item.update({
-                            where: { id: rItem.id },
-                            data: {
-                                relatedItems: {
-                                    connect: { id: newItem.id }
-                                }
+                for (const rItem of data.relatedItems) {
+                    await prisma.item.update({
+                        where: { id: rItem.id },
+                        data: {
+                            relatedItems: {
+                                connect: { id: newItem.id }
                             }
-                        });
-                    }
+                        }
+                    });
                 }
             }
+
+            // HISTORY RECORD
+            const snapshot: ItemSnapshot = {
+                title: newItem.title,
+                content: newItem.content,
+                attachments: newItem.attachments,
+                relatedItems: newItem.relatedItems
+            };
+
+            await createHistoryRecord(newItem, snapshot, { id: request.id, submittedById: request.submittedById }, "CREATE", session.user.id);
         }
         else if (request.type === "UPDATE") {
             if (!request.itemId) throw new Error("Missing target item ID");
+
+            // Fetch original for history
+            const originalItem = await prisma.item.findUnique({
+                where: { id: request.itemId },
+                include: { relatedItems: { select: { id: true, fullId: true } } }
+            });
+            if (!originalItem) throw new Error("Original item not found");
+
+            const oldSnapshot: ItemSnapshot = {
+                title: originalItem.title,
+                content: originalItem.content,
+                attachments: originalItem.attachments,
+                relatedItems: originalItem.relatedItems
+            };
 
             await prisma.item.update({
                 where: { id: request.itemId },
@@ -246,9 +358,43 @@ export async function approveRequest(requestId: number) {
                     title: data.title,
                     content: data.content,
                     attachments: data.attachments ? JSON.stringify(data.attachments) : undefined,
-                    updatedAt: new Date()
+                    updatedAt: new Date(),
+                    // Handle related items: disconnect all, then connect new ones
+                    relatedItems: data.relatedItems ? {
+                        set: data.relatedItems.map((ri: { id: number }) => ({ id: ri.id }))
+                    } : undefined
                 }
             });
+
+            // Handle symmetric relations if relatedItems changed
+            if (data.relatedItems) {
+                for (const rItem of data.relatedItems) {
+                    await prisma.item.update({
+                        where: { id: rItem.id },
+                        data: {
+                            relatedItems: {
+                                connect: { id: request.itemId }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Get Updated Item
+            const updatedItem = await prisma.item.findUnique({
+                where: { id: request.itemId },
+                include: { relatedItems: { select: { id: true, fullId: true } } }
+            });
+            if (updatedItem) {
+                const newSnapshot: ItemSnapshot = {
+                    title: updatedItem.title,
+                    content: updatedItem.content,
+                    attachments: updatedItem.attachments,
+                    relatedItems: updatedItem.relatedItems
+                };
+
+                await createHistoryRecord(updatedItem, newSnapshot, { id: request.id, submittedById: request.submittedById }, "UPDATE", session.user.id, oldSnapshot);
+            }
         }
         else if (request.type === "DELETE") {
             if (!request.itemId) throw new Error("Missing target item ID");
@@ -257,9 +403,48 @@ export async function approveRequest(requestId: number) {
             const childCount = await prisma.item.count({ where: { parentId: request.itemId, isDeleted: false } });
             if (childCount > 0) throw new Error("Cannot delete item with children");
 
+            // Fetch for history
+            const item = await prisma.item.findUnique({
+                where: { id: request.itemId },
+                include: { relatedItems: { select: { id: true, fullId: true } } }
+            });
+            if (!item) throw new Error("Item not found");
+
+            const lastSnapshot: ItemSnapshot = {
+                title: item.title,
+                content: item.content,
+                attachments: item.attachments,
+                relatedItems: item.relatedItems
+            };
+
             await prisma.item.update({
                 where: { id: request.itemId },
                 data: { isDeleted: true }
+            });
+
+            await createHistoryRecord(item, lastSnapshot, { id: request.id, submittedById: request.submittedById }, "DELETE", session.user.id);
+        }
+        else if (request.type === "PROJECT_UPDATE") {
+            if (!request.targetProjectId) throw new Error("Missing target project ID");
+
+            await prisma.project.update({
+                where: { id: request.targetProjectId },
+                data: {
+                    title: data.title,
+                    description: data.description || null,
+                    updatedAt: new Date()
+                }
+            });
+        }
+        else if (request.type === "PROJECT_DELETE") {
+            if (!request.targetProjectId) throw new Error("Missing target project ID");
+
+            // Double check that project has no items
+            const itemCount = await prisma.item.count({ where: { projectId: request.targetProjectId } });
+            if (itemCount > 0) throw new Error("Cannot delete project with existing items");
+
+            await prisma.project.delete({
+                where: { id: request.targetProjectId }
             });
         }
 
