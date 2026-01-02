@@ -51,3 +51,8 @@ next-env.d.ts
 # Uploads
 /public/uploads
 
+# Public folder (uploaded files)
+/public
+
+# Agent folder
+/.agent
