@@ -1,0 +1,49 @@
+services:
+  rms-app:
+    build: .
+    container_name: rms-application
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:/app/data/rms.db
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+    volumes:
+      # 資料庫持久化
+      - rms-data:/app/data
+      # 上傳檔案持久化
+      - rms-uploads:/app/public/uploads
+    networks:
+      - rms-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nginx:
+    image: nginx:alpine
+    container_name: rms-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - rms-uploads:/var/www/uploads:ro
+    depends_on:
+      - rms-app
+    networks:
+      - rms-network
+
+volumes:
+  rms-data:
+    driver: local
+  rms-uploads:
+    driver: local
+
+networks:
+  rms-network:
+    driver: bridge

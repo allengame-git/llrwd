@@ -1,17 +1,20 @@
-import { getProjectHistoryStats } from "@/actions/history";
+import { getProjectHistoryStats, getRecentUpdates } from "@/actions/history";
 import Link from "next/link";
+import RecentUpdatesTable from "@/components/history/RecentUpdatesTable";
 
 export const dynamic = 'force-dynamic';
 
 export default async function GlobalHistoryDashboard() {
     const projects = await getProjectHistoryStats();
+    const recentUpdates = await getRecentUpdates(100);
 
     return (
         <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Global Change History</h1>
-            <p style={{ marginBottom: '2rem', color: 'var(--color-text-muted)' }}>Select a project to view its change history including deleted items.</p>
+            <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>全域變更歷史</h1>
+            <p style={{ marginBottom: '2rem', color: 'var(--color-text-muted)' }}>選擇專案查看其變更歷史，包含已刪除的項目。</p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            {/* Project Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
                 {projects.map(p => (
                     <Link href={`/admin/history/${p.id}`} key={p.id} style={{ textDecoration: 'none', color: 'inherit' }}>
                         <div className="glass" style={{
@@ -33,18 +36,21 @@ export default async function GlobalHistoryDashboard() {
 
                             <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                                 <div>
-                                    <span style={{ fontWeight: 'bold' }}>{p._count.items}</span> Items
+                                    <span style={{ fontWeight: 'bold' }}>{p._count.items}</span> 個項目
                                 </div>
                                 <div style={{ color: 'var(--color-text-muted)' }}>
                                     {p.itemHistories.length > 0 ? (
-                                        `Last change: ${new Date(p.itemHistories[0].createdAt).toLocaleDateString()}`
-                                    ) : 'No history'}
+                                        `最後更新: ${new Date(p.itemHistories[0].createdAt).toLocaleDateString('zh-TW')}`
+                                    ) : '尚無歷史'}
                                 </div>
                             </div>
                         </div>
                     </Link>
                 ))}
             </div>
+
+            {/* Recent Updates Section with Filter */}
+            <RecentUpdatesTable updates={recentUpdates} />
         </div>
     )
 }

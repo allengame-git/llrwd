@@ -1,6 +1,6 @@
 # 技術文件 - 專案項目資訊管理系統 (tech.md)
 
->> 最後更新: 2026-01-02
+>> 最後更新: 2026-01-05
 
 ## 專案資訊
 
@@ -10,6 +10,7 @@
 | **技術棧** | Next.js 14, TypeScript, Prisma, SQLite, NextAuth.js |
 | **樣式方案** | Vanilla CSS + CSS Variables |
 | **編輯器** | Tiptap (ProseMirror-based) |
+| **部署方案** | Docker + Nginx (HTTPS) |
 
 ---
 

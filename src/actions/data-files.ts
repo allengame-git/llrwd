@@ -389,7 +389,7 @@ export async function approveDataFileRequest(requestId: number) {
 export async function rejectDataFileRequest(requestId: number, reviewNote?: string) {
     const session = await getServerSession(authOptions);
     if (!session) throw new Error('Unauthorized');
-    if (!['ADMIN', 'INSPECTOR'].includes(session.user.role)) {
+    if (!['ADMIN', 'INSPECTOR', 'EDITOR'].includes(session.user.role)) {
         throw new Error('Permission denied');
     }
 
@@ -400,10 +400,7 @@ export async function rejectDataFileRequest(requestId: number, reviewNote?: stri
     if (!request) throw new Error('Request not found');
     if (request.status !== 'PENDING') throw new Error('Request already processed');
 
-    // Self-rejection prevention
-    if (session.user.role !== 'ADMIN' && request.submittedById === session.user.id) {
-        throw new Error('您不能審核自己提交的申請');
-    }
+    // 允許使用者拒絕自己的申請（用於撤回）
 
     await prisma.dataFileChangeRequest.update({
         where: { id: requestId },

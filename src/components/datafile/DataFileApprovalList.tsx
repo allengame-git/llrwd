@@ -139,11 +139,7 @@ export default function DataFileApprovalList({
     };
 
     const handleReject = async (id: number) => {
-        const request = requests.find(r => r.id === id);
-        if (request && request.submittedBy.username === currentUsername && currentUserRole !== 'ADMIN') {
-            setErrorDialog('您不能審核自己提交的申請');
-            return;
-        }
+        // 允許使用者拒絕自己的申請
         setConfirmDialog({ id, action: 'reject' });
     };
 

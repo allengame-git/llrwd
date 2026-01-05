@@ -49,11 +49,7 @@ export default function ApprovalList({ requests, currentUsername }: { requests: 
 
     const handleRejectClick = (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
-        const request = requests.find(r => r.id === id);
-        if (request && request.submittedBy.username === currentUsername) {
-            setErrorDialog('您不能拒絕自己提交的申請。請由其他審核人員處理。');
-            return;
-        }
+        // 允許使用者拒絕自己的申請
         setConfirmDialog({ id, action: 'reject' });
     };
 

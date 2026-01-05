@@ -1,13 +1,16 @@
 # 功能實作計畫 (implementation_plan.md)
 
-> 最後更新: 2026-01-02
+> 最後更新: 2026-01-05
 
 本文件記錄各功能的需求分析與技術設計。
 
 ## 最新更新
 
-- **Phase 4.8**: 專案搜尋功能 ✅ 已完成 (2026-01-02)
-- **Phase 4.9**: UI 對話框優化與自我審核防止 ✅ 已完成 (2026-01-02)
+- **Phase 6.5**: Docker 部署準備 ✅ 已完成 (2026-01-05)
+- **Phase 6.4**: 全域歷史 Dashboard 優化 ✅ 已完成 (2026-01-05)
+- **Phase 6.3**: 內容比較優化 ✅ 已完成 (2026-01-05)
+- **Phase 6.2**: 審核權限調整 (允許撤回) ✅ 已完成 (2026-01-05)
+- **Phase 6.1**: Approval Dashboard 中文化 ✅ 已完成 (2026-01-02)
 
 ---
 
@@ -258,17 +261,6 @@ if (session.user.role !== "ADMIN" && request.submittedById === session.user.id) 
 
 ---
 
-## 待開發功能
-
-### Phase 4.4: 系統優化
-
-- [ ] 前端介面美化 (Rich Aesthetics)
-- [ ] 全系統整合測試
-- [ ] 使用說明文件 (Walkthrough)
-- [ ] 效能優化
-
----
-
 ## 9. Item History & Global Dashboard
 
 > Status: ✅ Done (v0.7.0)
@@ -297,3 +289,91 @@ if (session.user.role !== "ADMIN" && request.submittedById === session.user.id) 
 - Item Detail 頁面底部顯示近期變更
 - 獨立 History Detail 頁面顯示 Snapshot 與 Diff
 - Global Dashboard 採用三層式導覽 (Project -> Tree -> List)
+
+---
+
+## 10. Phase 6: 部署準備與優化
+
+> Status: ✅ Done (v0.9.0)
+
+### 10.1 Approval Dashboard 中文化
+
+- 項目變更申請卡片中文化
+- 檔案變更申請卡片中文化
+- 確認對話框中文化
+- 移除 Root Item / Child Item 標籤
+
+### 10.2 審核權限調整
+
+**變更規則**:
+
+- 使用者可以「拒絕」自己的申請 (撤回功能)
+- 使用者不能「批准」自己的申請 (ADMIN 例外)
+
+**實作**:
+
+```typescript
+// handleReject 移除自我拒絕限制
+const handleReject = async (id: number) => {
+    // 允許使用者拒絕自己的申請
+    setConfirmDialog({ id, action: 'reject' });
+};
+```
+
+### 10.3 內容比較優化
+
+- 項目變更申請「內容」欄位修改前後比較
+- 使用 flex 並排顯示 (修改前 | 修改後)
+
+### 10.4 全域歷史 Dashboard 優化
+
+- 頁面中文化 (專案/項目/檔案)
+- 新增「最近更新紀錄」區塊 (最新100筆)
+- 支援篩選功能 (全部/項目/檔案)
+- 相對時間顯示 (N分鐘前)
+
+**元件**:
+
+- `RecentUpdatesTable.tsx`: 可篩選的更新紀錄表格 (Client Component)
+- `getRecentUpdates()`: 合併 ItemHistory 和 DataFileHistory
+
+### 10.5 Docker 部署準備
+
+**建立檔案**:
+
+| 檔案 | 用途 |
+|------|------|
+| `Dockerfile` | 多階段構建 Node.js 應用映像 |
+| `docker-compose.yml` | 編排 App + Nginx 容器 |
+| `nginx/nginx.conf` | HTTPS 反向代理配置 |
+| `src/app/api/health/route.ts` | 健康檢查 API |
+| `scripts/backup.ps1` | Windows 自動備份腳本 |
+| `scripts/restore.ps1` | 災難復原腳本 |
+| `scripts/verify.ps1` | 自動檢驗腳本 |
+
+**文件**:
+
+| 文件 | 說明 |
+|------|------|
+| `docs/deployment_guide.md` | 完整部署規劃 |
+| `docs/deployment_steps.md` | Step-by-Step 部署指南 |
+| `docs/deployment_checklist.md` | 檢驗清單 |
+
+### 10.6 檔案上傳優化
+
+- 拖放上傳功能 (Drag & Drop)
+- 欄位必要性調整 (年份/名稱/作者/檔案必填，其他選填)
+- 視覺回饋 (拖曳時邊框變色、背景變化)
+
+**實作**:
+
+```typescript
+const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) setFile(droppedFile);
+};
+```
+
+### 狀態: ✅ 已完成

@@ -9,8 +9,33 @@ export default function UploadDataFileForm() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [file, setFile] = useState<File | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
 
     const currentYear = new Date().getFullYear();
+
+    // Drag and drop handlers
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const droppedFile = e.dataTransfer.files?.[0];
+        if (droppedFile) {
+            setFile(droppedFile);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -30,8 +55,8 @@ export default function UploadDataFileForm() {
             const author = formData.get('author') as string;
             const description = formData.get('description') as string;
 
-            // Validate
-            if (!dataYear || !dataName || !dataCode || !author || !description) {
+            // Validate - 只有資料年份、資料名稱、作者是必填
+            if (!dataYear || !dataName || !author) {
                 throw new Error('請填寫所有必填欄位');
             }
 
@@ -59,7 +84,7 @@ export default function UploadDataFileForm() {
                 dataName,
                 dataCode,
                 author,
-                description,
+                description: description || '',
                 fileName: uploadData.fileName,
                 filePath: uploadData.filePath,
                 fileSize: uploadData.fileSize,
@@ -149,14 +174,13 @@ export default function UploadDataFileForm() {
                         marginBottom: '0.5rem',
                         fontWeight: 600
                     }}>
-                        資料編碼 <span style={{ color: 'var(--color-danger)' }}>*</span>
+                        資料編碼
                     </label>
                     <input
                         type="text"
                         name="dataCode"
                         placeholder="輸入唯一資料編碼 (例: DOC-2026-001)"
-                        pattern="[A-Za-z0-9\-_]+"
-                        required
+                        pattern="[A-Za-z0-9\-_]*"
                         style={{
                             width: '100%',
                             padding: '0.75rem 1rem',
@@ -204,13 +228,12 @@ export default function UploadDataFileForm() {
                         marginBottom: '0.5rem',
                         fontWeight: 600
                     }}>
-                        內容簡介 <span style={{ color: 'var(--color-danger)' }}>*</span>
+                        內容簡介
                     </label>
                     <textarea
                         name="description"
                         placeholder="輸入內容簡介"
                         rows={4}
-                        required
                         style={{
                             width: '100%',
                             padding: '0.75rem 1rem',
@@ -232,13 +255,24 @@ export default function UploadDataFileForm() {
                     }}>
                         選擇檔案 <span style={{ color: 'var(--color-danger)' }}>*</span>
                     </label>
-                    <div style={{
-                        border: '2px dashed var(--color-border)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: '2rem',
-                        textAlign: 'center',
-                        backgroundColor: 'var(--color-bg-elevated)'
-                    }}>
+                    <div
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        style={{
+                            border: isDragging
+                                ? '2px solid var(--color-primary)'
+                                : '2px dashed var(--color-border)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '2rem',
+                            textAlign: 'center',
+                            backgroundColor: isDragging
+                                ? 'rgba(59, 130, 246, 0.1)'
+                                : 'var(--color-bg-elevated)',
+                            transition: 'all 0.2s ease',
+                            transform: isDragging ? 'scale(1.02)' : 'scale(1)'
+                        }}
+                    >
                         <input
                             type="file"
                             onChange={(e) => setFile(e.target.files?.[0] || null)}
@@ -247,7 +281,7 @@ export default function UploadDataFileForm() {
                         />
                         <label
                             htmlFor="file-input"
-                            style={{ cursor: 'pointer' }}
+                            style={{ cursor: 'pointer', display: 'block' }}
                         >
                             {file ? (
                                 <div>
@@ -256,12 +290,27 @@ export default function UploadDataFileForm() {
                                     <div style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
                                         {(file.size / (1024 * 1024)).toFixed(2)} MB
                                     </div>
+                                    <div style={{
+                                        color: 'var(--color-primary)',
+                                        fontSize: '0.85rem',
+                                        marginTop: '0.5rem',
+                                        textDecoration: 'underline'
+                                    }}>
+                                        點擊更換檔案
+                                    </div>
+                                </div>
+                            ) : isDragging ? (
+                                <div>
+                                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📥</div>
+                                    <div style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
+                                        放開以上傳檔案
+                                    </div>
                                 </div>
                             ) : (
                                 <div>
                                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📁</div>
                                     <div style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
-                                        點擊選擇檔案
+                                        拖放檔案至此處，或點擊選擇
                                     </div>
                                     <div style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                                         最大 100MB

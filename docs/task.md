@@ -1,6 +1,6 @@
 # 專案項目資訊管理系統 - 開發進度 (task.md)
 
->> 最後更新: 2026-01-02
+>> 最後更新: 2026-01-05
 
 ## 進度總覽
 
@@ -11,6 +11,7 @@
 | Phase 3 | 進階內容功能 | ✅ 完成 |
 | Phase 4 | UI 優化與測試 | ✅ 完成 |
 | Phase 5 | 檔案管理系統 | ✅ 完成 |
+| Phase 6 | 部署準備與優化 | ✅ 完成 |
 
 ---
 
@@ -60,91 +61,15 @@
 - [x] 更新審核權限邏輯 (Inspector 可審核)
 - [x] **[檢核]** 各角色權限行為正確 ✅
 
-### Phase 4.2: 項目編輯與刪除審核流程 ✅
+### Phase 4.2-4.9 ✅
 
-- [x] 擴充 Change Request 類型 (CREATE/UPDATE/DELETE)
-- [x] 實作 `submitUpdateItemRequest` Server Action
-- [x] 實作 `submitDeleteItemRequest` (含子項目檢查)
-- [x] 實作前端 Edit 按鈕與 Modal
-- [x] 實作前端 Delete 按鈕與防呆邏輯
-- [x] **[檢核]** 編輯/刪除申請流程正常 ✅
-
-### Phase 4.3: Rich Text Editor 圖片功能增強 ✅
-
-- [x] 修正 Link/Image URL 按鈕閃退問題
-  - 改用 React Dialog 取代 window.prompt()
-- [x] 實作圖片直接上傳功能 (📷 上傳圖片按鈕)
-- [x] 實作圖片貼上功能 (Ctrl+V / Cmd+V)
-- [x] 實作圖片拖放功能 (Drag & Drop)
-- [x] 實作自定義表格大小功能 (Table Size Dialog)
-- [x] 優化 Link 插入流程 (Link Dialog: 支援同時輸入文字與 URL)
-- [x] 實作導覽選單摺疊功能 (Collapsible Tree Nodes)
-- [x] 實作當前項目高亮標示 (Current Item Highlighting)
-- [x] **[檢核]** 圖片、表格、連結優化、選單摺疊與高亮功能正常 ✅
-
-### Phase 4.5: Approval Dashboard 優化 ✅
-
-- [x] UPDATE 請求顯示項目編號與提交人
-- [x] 實作自我審核防呆機制 (非 ADMIN 不可審核自己的申請)
-- [x] 重新設計 Dashboard UI (卡片式佈局、可展開詳情)
-- [x] **Detail View Enhancement**: 顯示完整欄位 (Title, Content, Attachments, Related Items) 與變更標記
-- [x] **[檢核]** Approval Dashboard 功能與 UI 正常 ✅
-
-### Phase 4.6: Project Management Enhancements ✅
-
-- [x] **Project Edit Flow** (UPDATE)
-  - [x] 建立 `PROJECT_UPDATE` 審核類型
-  - [x] 專案列表頁面新增編輯按鈕 (權限: EDITOR/INSPECTOR/ADMIN)
-  - [x] 整合至 Approval Dashboard
-- [x] **Project Delete Flow** (DELETE)
-  - [x] 建立 `PROJECT_DELETE` 審核類型
-  - [x] 專案列表頁面新增刪除按鈕 (權限: ADMIN Only)
-  - [x] 實作刪除防呆 (已有 Items 的專案不可刪除)
-- [x] **UI/UX Optimization**
-  - [x] Item 詳情頁 Related Items 依專案分組與自然排序
-  - [x] Project Delete 確認對話框優化
-
-### Phase 4.7: Item History & Global Dashboard (v0.7.0) ✅
-
-- [x] **Database Schema**
-  - [x] Add `ItemHistory` model with snapshot and diff
-  - [x] Add redundant fields (`itemFullId`, `itemTitle`, `projectId`) for deleted items
-  - [x] Update `Item`, `User`, `Project` relations
-- [x] **Backend Logic**
-  - [x] Implement `createHistoryRecord` (Auto-create on approval)
-  - [x] Implement query actions (`getItemHistory`, `getGlobalHistory`)
-- [x] **UI Implementation**
-  - [x] **Item Detail**: Inline specific history list at bottom
-  - [x] **History Detail**: View snapshot and diff
-  - [x] **Global Dashboard**: Admin page for all histories (Project -> Tree -> History)
-- [x] **Verification**
-  - [x] Verify history creation on CREATE/UPDATE/DELETE
-  - [x] Verify global history access for deleted items
-
-### Phase 4.8: Project Search Feature ✅
-
-- [x] 實作專案內搜尋功能 (Project-specific search)
-- [x] 實作搜尋 API (`searchProjectItems` Server Action)
-- [x] HTML/JSON 語法過濾機制 (避免搜尋到標籤內容)
-- [x] 關鍵字高亮顯示 (Highlight 功能)
-- [x] 搜尋結果頁面與卡片 UI
-- [x] **[檢核]** 搜尋功能正常，高亮顯示正確 ✅
-
-### Phase 4.9: UI Dialog Improvements & Self-Approval Prevention ✅
-
-- [x] **Dialog UI Optimization**
-  - [x] 修復刪除對話框閃現問題 (DeleteItemButton)
-  - [x] 修復 Approval Dashboard 對話框閃現問題
-  - [x] 統一所有對話框採用 glass modal 設計
-  - [x] 添加 backdrop blur 效果
-- [x] **Self-Approval Visual Indicators**
-  - [x] 自己提交的申請卡片標注 (⚠️ 您提交的申請)
-  - [x] 卡片黃色警告邊框與淺黃背景
-- [x] **Self-Approval Prevention Logic**
-  - [x] 點擊 Approve/Reject 自己的申請時顯示錯誤對話框
-  - [x] 錯誤對話框顯示「權限受限」警告
-  - [x] 防止自我審核操作 (ADMIN 例外)
-- [x] **[檢核]** 對話框 UI 統一，自我審核防止機制正常 ✅
+- [x] 項目編輯/刪除審核流程
+- [x] Rich Text Editor 圖片功能增強
+- [x] Approval Dashboard 優化
+- [x] Project Management Enhancements
+- [x] Item History & Global Dashboard
+- [x] Project Search Feature
+- [x] UI Dialog Improvements & Self-Approval Prevention
 
 ---
 
@@ -152,59 +77,75 @@
 
 ### Phase 5.1: Database Schema & Backend ✅
 
-- [x] **Database Models**
-  - [x] 建立 `DataFile` 模型 (metadata + file info)
-  - [x] 建立 `DataFileChangeRequest` 模型 (審核流程)
-  - [x] 建立 `DataFileHistory` 模型 (版本歷史)
-  - [x] 更新 `User` 關聯
-- [x] **Server Actions**
-  - [x] Query: `getDataFiles`, `getDataFile`, `searchDataFiles`, `getDataFileYears`
-  - [x] Request: `submitCreateDataFileRequest`, `submitUpdateDataFileRequest`, `submitDeleteDataFileRequest`
-  - [x] Approval: `getPendingDataFileRequests`, `approveDataFileRequest`, `rejectDataFileRequest`
-- [x] **File Upload API**
-  - [x] 建立 `/api/datafiles/upload` endpoint
-  - [x] 100MB 檔案大小限制
-  - [x] 年份目錄結構 (`/public/uploads/datafiles/{year}`)
-  - [x] 唯一檔名生成
+- [x] DataFile, DataFileChangeRequest, DataFileHistory 模型
+- [x] Server Actions (Query, Request, Approval)
+- [x] File Upload API (100MB limit)
 
 ### Phase 5.2: Frontend Pages & Components ✅
 
-- [x] **Pages**
-  - [x] `/datafiles` - 檔案列表頁 (年份篩選、搜尋)
-  - [x] `/datafiles/upload` - 檔案上傳頁
-  - [x] `/datafiles/[id]` - 檔案詳情頁
-  - [x] `/datafiles/search` - 搜尋結果頁
-- [x] **Components**
-  - [x] `DataFileList` - 檔案列表元件 (卡片/清單雙視圖、排序)
-  - [x] `UploadDataFileForm` - 上傳表單 (5 個 metadata 欄位)
-  - [x] `EditDataFileButton` - 編輯按鈕與 Modal
-  - [x] `DeleteDataFileButton` - 刪除按鈕與確認對話框
-  - [x] `DataFileApprovalList` - 審核列表 (前後比較)
+- [x] `/datafiles` - 檔案列表頁 (年份篩選、搜尋)
+- [x] `/datafiles/upload` - 檔案上傳頁 (支援拖放)
+- [x] `/datafiles/[id]` - 檔案詳情頁
+- [x] 卡片/清單雙視圖、多欄位排序
 
 ### Phase 5.3: Features & Enhancements ✅
 
-- [x] **View Toggle & Sorting**
-  - [x] 卡片/清單雙視圖切換
-  - [x] 多欄位排序 (名稱、編碼、年份、作者、大小、時間)
-  - [x] 升序/降序切換
-- [x] **Pending Review Badge**
-  - [x] 卡片視圖顯示「⏳ 審核中」標籤
-  - [x] 清單視圖新增「狀態」欄位
-  - [x] 區分申請類型 (新增/編輯/刪除)
-- [x] **Approval Workflow**
-  - [x] 整合至 `/admin/approval` 頁面
-  - [x] 前後比較功能 (類似 Item 審核)
-  - [x] 修改欄位提示與高亮
-  - [x] ADMIN 自我審核例外處理
-- [x] **Navigation Integration**
-  - [x] Navbar 新增「Files」連結
+- [x] 拖放上傳功能 (Drag & Drop)
+- [x] 表單欄位必要性調整 (年份/名稱/作者/檔案必填)
+- [x] 審核流程整合與前後比較
 - [x] **[檢核]** 檔案管理完整功能正常 ✅
 
 ---
 
-## 下一步
+## Phase 6: 部署準備與優化 (v0.9.0) ✅
 
-- [ ] 進行全系統整合測試
-- [ ] 優化前端介面 (Rich Aesthetics)
-- [ ] 撰寫完整使用說明 (Walkthrough)
-- [ ] 最終技術文件整理
+### Phase 6.1: Approval Dashboard 中文化 ✅
+
+- [x] 項目變更申請卡片中文化
+- [x] 檔案變更申請卡片中文化
+- [x] 確認對話框中文化
+- [x] 移除 Root Item / Child Item 標籤
+
+### Phase 6.2: 審核權限調整 ✅
+
+- [x] 允許使用者拒絕自己的申請 (撤回功能)
+- [x] 批准仍需其他審核人員 (ADMIN 例外)
+
+### Phase 6.3: 內容比較優化 ✅
+
+- [x] 項目變更申請「內容」欄位修改前後比較
+
+### Phase 6.4: 全域歷史 Dashboard ✅
+
+- [x] 頁面中文化
+- [x] 新增「最近更新紀錄」區塊 (最新100筆)
+- [x] 支援篩選功能 (全部/項目/檔案)
+
+### Phase 6.5: Docker 部署準備 ✅
+
+- [x] 建立 Dockerfile
+- [x] 建立 docker-compose.yml
+- [x] 建立 nginx/nginx.conf (HTTPS 反向代理)
+- [x] 建立健康檢查 API (`/api/health`)
+- [x] 編寫 Windows PowerShell 備份/還原腳本
+- [x] 編寫部署文件 (deployment_guide.md, deployment_steps.md)
+- [x] 編寫檢驗清單 (deployment_checklist.md)
+
+---
+
+## 已完成功能總覽
+
+- ✅ 專案與項目 CRUD
+- ✅ 階層式項目結構 (無限層級)
+- ✅ 自動編號系統
+- ✅ 審核流程 (CREATE/UPDATE/DELETE)
+- ✅ 四層權限控管
+- ✅ 富文本編輯器 (含圖片、表格)
+- ✅ 檔案附件管理
+- ✅ 檔案管理系統 (獨立模組)
+- ✅ 拖放上傳
+- ✅ 專案搜尋 (關鍵字高亮)
+- ✅ 項目歷史與版本比較
+- ✅ 全域變更歷史 Dashboard
+- ✅ 中文化介面
+- ✅ Docker 部署配置

@@ -13,14 +13,15 @@ RMS 是一個基於 Next.js 開發的專案項目資訊管理系統，提供階�
 - 🔢 **自動編號** - 項目自動產生唯一編號 (如 `WQ-1`, `WQ-1-1`)
 - ✅ **審核流程** - 變更申請需經審核 (建立/編輯/刪除)，包含 Project、Item 與 DataFile，優化的 Dashboard UI 與防呆機制
 - 🔍 **專案搜尋** - 專案內全文搜尋，關鍵字高亮顯示，過濾 HTML/JSON 語法
-- 🔐 **權限控管** - 四層角色權限 (Viewer/Editor/Inspector/Admin)，自我審核防止機制 (ADMIN 例外)
+- 🔐 **權限控管** - 四層角色權限 (Viewer/Editor/Inspector/Admin)，自我審核防止機制 (ADMIN 例外)，允許使用者拒絕自己的申請（撤回）
 - 📝 **富文本編輯** - 支援文字格式、自定義大小表格 (1x1 ~ 20x20)、圖片、優化 Link 插入流程 (支援同時輸入文字與 URL)
 - 📎 **檔案附件** - 支援 PDF、Word、圖片上傳
-- 📄 **檔案管理系統** - 獨立檔案管理模組，支援檔案上傳 (100MB)、年份分類、卡片/清單雙視圖、排序、搜尋、審核流程與前後比較
+- 📄 **檔案管理系統** - 獨立檔案管理模組，支援拖放上傳 (100MB)、年份分類、卡片/清單雙視圖、排序、搜尋、審核流程與前後比較
 - 🕰️ **項目歷史紀錄** - 完整記錄項目的建立、變更與刪除歷史，支援版本比對 (Diff) 與快照檢視
-- 📊 **全域變更歷史** - 提供全域變更歷史 Dashboard，所有使用者皆可瀏覽專案變更與已刪除項目
-- 🎨 **統一 UI 設計** - 所有對話框採用 glass modal 設計，backdrop blur 效果
+- 📊 **全域變更歷史** - 提供全域變更歷史 Dashboard，最近更新紀錄 (最新100筆，支援篩選項目/檔案)
+- 🎨 **統一 UI 設計** - 所有對話框採用 glass modal 設計，backdrop blur 效果，中文化介面
 - 🌓 **主題切換** - 淺色/深色模式
+- 🐳 **容器化部署** - 支援 Docker 部署，包含 Nginx 反向代理與 HTTPS
 
 ---
 
@@ -34,6 +35,7 @@ RMS 是一個基於 Next.js 開發的專案項目資訊管理系統，提供階�
 | 認證 | NextAuth.js |
 | 編輯器 | Tiptap (ProseMirror) |
 | 樣式 | Vanilla CSS + CSS Variables |
+| 部署 | Docker + Nginx |
 
 ---
 
@@ -93,7 +95,7 @@ npm run dev
 src/
 ├── app/                    # Next.js App Router
 │   ├── api/               # API Routes
-│   ├── admin/             # 管理後台 (審核、使用者)
+│   ├── admin/             # 管理後台 (審核、使用者、歷史)
 │   ├── projects/          # 專案頁面
 │   ├── items/             # 項目頁面
 │   └── datafiles/         # 檔案管理頁面
@@ -102,6 +104,7 @@ src/
 │   ├── editor/           # 富文本編輯器
 │   ├── item/             # 項目相關
 │   ├── datafile/         # 檔案管理相關
+│   ├── history/          # 歷史紀錄相關
 │   └── layout/           # 佈局元件
 └── lib/                   # 工具函式
 ```
@@ -115,7 +118,9 @@ src/
 | [docs/task.md](docs/task.md) | 開發進度追蹤 |
 | [docs/tech.md](docs/tech.md) | 技術文件 |
 | [docs/implementation_plan.md](docs/implementation_plan.md) | 功能實作計畫 |
-| [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md) | 下次開始指南 |
+| [docs/deployment_guide.md](docs/deployment_guide.md) | Windows 部署規劃 |
+| [docs/deployment_steps.md](docs/deployment_steps.md) | Step-by-Step 部署指南 |
+| [docs/deployment_checklist.md](docs/deployment_checklist.md) | 部署檢驗清單 |
 
 ---
 
@@ -136,6 +141,21 @@ npx prisma studio
 
 # 更新 Prisma Client
 npx prisma generate
+```
+
+---
+
+## Docker 部署
+
+```bash
+# 建置映像
+docker compose build
+
+# 啟動服務
+docker compose up -d
+
+# 查看日誌
+docker compose logs -f
 ```
 
 ---

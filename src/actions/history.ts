@@ -250,3 +250,58 @@ export async function getItemHistoryByFullId(projectId: number, itemFullId: stri
     });
     return history;
 }
+
+/**
+ * Get recent updates combining ItemHistory and DataFileHistory
+ */
+export async function getRecentUpdates(limit = 100) {
+    // 1. 查詢 ItemHistory 最近記錄
+    const itemHistories = await prisma.itemHistory.findMany({
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+            submittedBy: { select: { username: true } },
+            project: { select: { title: true } }
+        }
+    });
+
+    // 2. 查詢 DataFileHistory 最近記錄
+    const fileHistories = await prisma.dataFileHistory.findMany({
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+            submittedBy: { select: { username: true } }
+        }
+    });
+
+    // 3. 轉換為統一格式
+    const itemUpdates = itemHistories.map(h => ({
+        id: `item-${h.id}`,
+        type: 'ITEM' as const,
+        changeType: h.changeType,
+        identifier: h.itemFullId,
+        name: h.itemTitle,
+        projectTitle: h.project?.title || '',
+        submittedBy: h.submittedBy.username,
+        createdAt: h.createdAt
+    }));
+
+    const fileUpdates = fileHistories.map(h => ({
+        id: `file-${h.id}`,
+        type: 'FILE' as const,
+        changeType: h.changeType,
+        identifier: h.dataCode,
+        name: h.dataName,
+        projectTitle: `${h.dataYear}年度`,
+        submittedBy: h.submittedBy.username,
+        createdAt: h.createdAt
+    }));
+
+    // 4. 合併並排序，取前 limit 筆
+    const combined = [...itemUpdates, ...fileUpdates]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limit);
+
+    return combined;
+}
+
