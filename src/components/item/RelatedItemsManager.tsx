@@ -2,27 +2,33 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { addRelatedItem, removeRelatedItem } from '@/actions/item-relations';
+import { addRelatedItem, removeRelatedItem, updateRelatedItemDescription } from '@/actions/item-relations';
 
 interface RelatedItem {
     id: number;
     fullId: string;
     title: string;
     projectId: number;
+    projectTitle?: string;
+    description?: string | null;
 }
 
 interface RelatedItemsManagerProps {
-    sourceItemId?: number; // Optional now
+    sourceItemId?: number;
     initialRelatedItems: RelatedItem[];
-    onChange?: (items: RelatedItem[]) => void; // New prop for draft mode
+    onChange?: (items: RelatedItem[]) => void;
     canEdit?: boolean;
 }
 
 export default function RelatedItemsManager({ sourceItemId, initialRelatedItems, onChange, canEdit = true }: RelatedItemsManagerProps) {
     const [relatedItems, setRelatedItems] = useState<RelatedItem[]>(initialRelatedItems);
     const [newItemId, setNewItemId] = useState('');
+    const [newDescription, setNewDescription] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    // Edit state
+    const [editingItemId, setEditingItemId] = useState<number | null>(null);
+    const [editDescription, setEditDescription] = useState('');
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -32,21 +38,18 @@ export default function RelatedItemsManager({ sourceItemId, initialRelatedItems,
         setError('');
 
         try {
-            // If in draft mode (onChange provided), we just validate existence via API
             if (onChange) {
-                // We need a way to lookup item by fullId. 
-                // We can use the lookup API we created for the editor extensions.
+                // Draft mode - validate via API
                 const response = await fetch(`/api/items/lookup?fullId=${newItemId.trim()}`);
                 if (!response.ok) {
                     const data = await response.json();
-                    setError(data.error || 'Item not found');
+                    setError(data.error || '項目不存在');
                     return;
                 }
                 const itemData = await response.json();
 
-                // Check duplicates locally
                 if (relatedItems.some(i => i.id === itemData.id)) {
-                    setError('Item already related');
+                    setError('項目已經是關聯項目');
                     return;
                 }
 
@@ -54,34 +57,37 @@ export default function RelatedItemsManager({ sourceItemId, initialRelatedItems,
                     id: itemData.id,
                     fullId: itemData.fullId,
                     title: itemData.title,
-                    projectId: itemData.projectId
+                    projectId: itemData.projectId,
+                    description: newDescription.trim() || null
                 };
 
                 const updated = [...relatedItems, newItem];
                 setRelatedItems(updated);
                 onChange(updated);
                 setNewItemId('');
+                setNewDescription('');
             } else {
-                // Existing Server Action Logic
+                // Server Action mode
                 if (!sourceItemId) return;
-                const result = await addRelatedItem(sourceItemId, newItemId.trim());
+                const result = await addRelatedItem(sourceItemId, newItemId.trim(), newDescription.trim() || undefined);
                 if (result.success) {
                     setNewItemId('');
+                    setNewDescription('');
                     window.location.reload();
                 } else {
-                    setError(result.error || 'Failed to add item');
+                    setError(result.error || '新增失敗');
                 }
             }
         } catch (err) {
             console.error(err);
-            setError('An error occurred');
+            setError('發生錯誤');
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleRemove = async (targetId: number) => {
-        if (!confirm('Are you sure you want to remove this relation?')) return;
+        if (!confirm('確定要移除此關聯項目嗎？')) return;
 
         if (onChange) {
             const updated = relatedItems.filter(item => item.id !== targetId);
@@ -95,108 +101,319 @@ export default function RelatedItemsManager({ sourceItemId, initialRelatedItems,
                 if (result.success) {
                     window.location.reload();
                 } else {
-                    setError(result.error || 'Failed to remove item');
+                    setError(result.error || '移除失敗');
                 }
             } catch (err) {
-                setError('An error occurred');
+                setError('發生錯誤');
             } finally {
                 setIsLoading(false);
             }
         }
     };
 
+    const handleStartEdit = (item: RelatedItem) => {
+        setEditingItemId(item.id);
+        setEditDescription(item.description || '');
+    };
+
+    const handleCancelEdit = () => {
+        setEditingItemId(null);
+        setEditDescription('');
+    };
+
+    const handleSaveEdit = async (targetId: number) => {
+        if (onChange) {
+            // Draft mode - update locally
+            const updated = relatedItems.map(item =>
+                item.id === targetId ? { ...item, description: editDescription.trim() || null } : item
+            );
+            setRelatedItems(updated);
+            onChange(updated);
+            setEditingItemId(null);
+            setEditDescription('');
+        } else {
+            // Server Action mode
+            if (!sourceItemId) return;
+            setIsLoading(true);
+            try {
+                const result = await updateRelatedItemDescription(sourceItemId, targetId, editDescription.trim());
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    setError(result.error || '更新失敗');
+                }
+            } catch (err) {
+                setError('發生錯誤');
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    };
+
+    // Group by project
+    const groupedItems = relatedItems.reduce((acc, item) => {
+        const projectTitle = item.projectTitle || `專案 ${item.projectId}`;
+        if (!acc[projectTitle]) {
+            acc[projectTitle] = [];
+        }
+        acc[projectTitle].push(item);
+        return acc;
+    }, {} as Record<string, RelatedItem[]>);
+
     return (
         <div style={{ marginTop: '2rem' }} className="glass">
-            <h3 style={{ marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Related Items</h3>
+            <h3 style={{
+                marginBottom: '1rem',
+                borderBottom: '1px solid var(--color-border)',
+                paddingBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+            }}>
+                📎 關聯項目
+                <span style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 'normal',
+                    color: 'var(--color-text-muted)'
+                }}>
+                    ({relatedItems.length})
+                </span>
+            </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                {relatedItems.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No related items.</p>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                {relatedItems.length === 0 && (
+                    <p style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                        尚無關聯項目
+                    </p>
+                )}
 
-                {relatedItems.map(item => (
-                    <div key={item.id} style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '0.75rem',
-                        backgroundColor: 'rgba(0,0,0,0.02)',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--color-border)'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            {/* In draft mode, we might not want clickable links if they navigate away? 
-                                Or open in new tab? Let's keep it consistent. */}
-                            <Link href={`/items/${item.id}`} target="_blank" style={{ fontWeight: 'bold', fontFamily: 'var(--font-geist-mono)', color: 'var(--color-primary)' }}>
-                                {item.fullId}
-                            </Link>
-                            <span>{item.title}</span>
+                {Object.entries(groupedItems).map(([projectTitle, items]) => (
+                    <div key={projectTitle}>
+                        <div style={{
+                            fontSize: '0.8rem',
+                            color: 'var(--color-text-muted)',
+                            marginBottom: '0.5rem',
+                            fontWeight: 600
+                        }}>
+                            {projectTitle}
                         </div>
-                        {canEdit && (
-                            <button
-                                onClick={() => handleRemove(item.id)}
-                                disabled={isLoading}
-                                style={{
-                                    color: 'var(--color-danger, #ef4444)',
-                                    padding: '0.25rem 0.5rem',
-                                    borderRadius: '4px',
-                                    border: '1px solid currentColor',
-                                    background: 'transparent',
-                                    cursor: 'pointer',
-                                    fontSize: '0.8rem'
-                                }}
-                            >
-                                Remove
-                            </button>
-                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {items.map(item => (
+                                <div key={item.id} style={{
+                                    padding: '1rem',
+                                    backgroundColor: 'var(--color-bg-elevated)',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1px solid var(--color-border)',
+                                    transition: 'box-shadow 0.2s'
+                                }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'flex-start',
+                                        marginBottom: (item.description || editingItemId === item.id) ? '0.5rem' : 0
+                                    }}>
+                                        <div>
+                                            <Link
+                                                href={`/items/${item.id}`}
+                                                target="_blank"
+                                                style={{
+                                                    fontWeight: 'bold',
+                                                    fontFamily: 'var(--font-geist-mono)',
+                                                    color: 'var(--color-primary)',
+                                                    fontSize: '0.95rem'
+                                                }}
+                                            >
+                                                {item.fullId}
+                                            </Link>
+                                            <span style={{
+                                                marginLeft: '0.75rem',
+                                                color: 'var(--color-text)'
+                                            }}>
+                                                {item.title}
+                                            </span>
+                                        </div>
+                                        {canEdit && (
+                                            <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                                                {editingItemId !== item.id && (
+                                                    <button
+                                                        onClick={() => handleStartEdit(item)}
+                                                        disabled={isLoading}
+                                                        style={{
+                                                            color: 'var(--color-primary)',
+                                                            padding: '0.25rem 0.5rem',
+                                                            borderRadius: '4px',
+                                                            border: '1px solid currentColor',
+                                                            background: 'transparent',
+                                                            cursor: 'pointer',
+                                                            fontSize: '0.75rem'
+                                                        }}
+                                                    >
+                                                        編輯
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleRemove(item.id)}
+                                                    disabled={isLoading}
+                                                    style={{
+                                                        color: 'var(--color-danger, #ef4444)',
+                                                        padding: '0.25rem 0.5rem',
+                                                        borderRadius: '4px',
+                                                        border: '1px solid currentColor',
+                                                        background: 'transparent',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.75rem'
+                                                    }}
+                                                >
+                                                    移除
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Editing mode */}
+                                    {editingItemId === item.id ? (
+                                        <div style={{
+                                            marginTop: '0.5rem',
+                                            display: 'flex',
+                                            gap: '0.5rem',
+                                            alignItems: 'center'
+                                        }}>
+                                            <input
+                                                type="text"
+                                                value={editDescription}
+                                                onChange={(e) => setEditDescription(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleSaveEdit(item.id);
+                                                    } else if (e.key === 'Escape') {
+                                                        handleCancelEdit();
+                                                    }
+                                                }}
+                                                placeholder="描述說明"
+                                                autoFocus
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '0.5rem 0.75rem',
+                                                    borderRadius: 'var(--radius-sm)',
+                                                    border: '1px solid var(--color-primary)',
+                                                    fontSize: '0.85rem'
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => handleSaveEdit(item.id)}
+                                                disabled={isLoading}
+                                                style={{
+                                                    padding: '0.5rem 0.75rem',
+                                                    borderRadius: 'var(--radius-sm)',
+                                                    border: 'none',
+                                                    background: 'var(--color-primary)',
+                                                    color: 'white',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.75rem'
+                                                }}
+                                            >
+                                                儲存
+                                            </button>
+                                            <button
+                                                onClick={handleCancelEdit}
+                                                style={{
+                                                    padding: '0.5rem 0.75rem',
+                                                    borderRadius: 'var(--radius-sm)',
+                                                    border: '1px solid var(--color-border)',
+                                                    background: 'transparent',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.75rem'
+                                                }}
+                                            >
+                                                取消
+                                            </button>
+                                        </div>
+                                    ) : item.description && (
+                                        <div style={{
+                                            fontSize: '0.85rem',
+                                            color: 'var(--color-text-muted)',
+                                            paddingLeft: '0.5rem',
+                                            borderLeft: '2px solid var(--color-border)',
+                                            marginTop: '0.5rem'
+                                        }}>
+                                            {item.description}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 ))}
             </div>
 
             {canEdit && (
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input
-                        type="text"
-                        value={newItemId}
-                        onChange={(e) => setNewItemId(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault(); // Prevent submit of parent form
-                                // Only trigger add if we have a value. 
-                                // Creating a synthetic event is tricky for handleAdd(e: React.FormEvent).
-                                // Let's modify handleAdd to not rely on event or just pass null/mock.
-                                // But handleAdd calls e.preventDefault().
-                                // So let's just create a wrapper or refactor handleAdd.
-                                // Simplest: pass a dummy object with preventDefault.
-                                if (newItemId.trim()) handleAdd({ preventDefault: () => { } } as React.FormEvent);
-                            }
-                        }}
-                        placeholder="Enter Item ID (e.g. WQ-1)"
-                        style={{
-                            flex: 1,
-                            padding: '0.5rem',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid var(--color-border)'
-                        }}
-                    />
-                    <button
-                        type="button"
-                        onClick={(e) => handleAdd(e as unknown as React.FormEvent)}
-                        disabled={isLoading || !newItemId.trim()}
-                        style={{
-                            padding: '0.5rem 1rem',
-                            backgroundColor: 'var(--color-primary)',
-                            color: 'white',
-                            borderRadius: 'var(--radius-sm)',
-                            border: 'none',
-                            cursor: 'pointer',
-                            opacity: isLoading ? 0.7 : 1
-                        }}
-                    >
-                        {isLoading ? 'Adding...' : 'Add Relation'}
-                    </button>
+                <div style={{
+                    borderTop: '1px solid var(--color-border)',
+                    paddingTop: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                }}>
+                    <div style={{
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        marginBottom: '0.25rem'
+                    }}>
+                        新增關聯項目
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <input
+                            type="text"
+                            value={newItemId}
+                            onChange={(e) => setNewItemId(e.target.value)}
+                            placeholder="項目編號 (如 SI-1-2)"
+                            style={{
+                                width: '160px',
+                                padding: '0.5rem 0.75rem',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--color-border)',
+                                fontFamily: 'var(--font-geist-mono)',
+                                fontSize: '0.9rem'
+                            }}
+                        />
+                        <input
+                            type="text"
+                            value={newDescription}
+                            onChange={(e) => setNewDescription(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (newItemId.trim()) handleAdd({ preventDefault: () => { } } as React.FormEvent);
+                                }
+                            }}
+                            placeholder="描述說明 (選填)"
+                            style={{
+                                flex: 1,
+                                minWidth: '200px',
+                                padding: '0.5rem 0.75rem',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--color-border)',
+                                fontSize: '0.9rem'
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={(e) => handleAdd(e as unknown as React.FormEvent)}
+                            disabled={isLoading || !newItemId.trim()}
+                            className="btn btn-primary"
+                            style={{
+                                padding: '0.5rem 1rem',
+                                fontSize: '0.9rem',
+                                opacity: isLoading || !newItemId.trim() ? 0.6 : 1
+                            }}
+                        >
+                            {isLoading ? '新增中...' : '新增關聯'}
+                        </button>
+                    </div>
                 </div>
             )}
-            {error && <p style={{ color: '#ef4444', marginTop: '0.5rem', fontSize: '0.9rem' }}>{error}</p>}
-            {error && <p style={{ color: '#ef4444', marginTop: '0.5rem', fontSize: '0.9rem' }}>{error}</p>}
+            {error && <p style={{ color: 'var(--color-danger)', marginTop: '0.75rem', fontSize: '0.85rem' }}>{error}</p>}
         </div>
     );
 }

@@ -9,12 +9,32 @@ export default function Navbar() {
     const pathname = usePathname();
     const { data: session } = useSession();
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [pendingCount, setPendingCount] = useState(0);
 
     useEffect(() => {
         // Load theme on mount
         const savedTheme = (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
         setTheme(savedTheme);
     }, []);
+
+    // Fetch pending count for ADMIN/INSPECTOR
+    useEffect(() => {
+        if (session && (session.user.role === "ADMIN" || session.user.role === "INSPECTOR")) {
+            const fetchCount = async () => {
+                try {
+                    const res = await fetch('/api/pending-count');
+                    const data = await res.json();
+                    setPendingCount(data.count || 0);
+                } catch (e) {
+                    console.error('Failed to fetch pending count');
+                }
+            };
+            fetchCount();
+            // Refresh every 30 seconds
+            const interval = setInterval(fetchCount, 30000);
+            return () => clearInterval(interval);
+        }
+    }, [session]);
 
     const isActive = (path: string) => pathname === path ? "active" : "";
 
@@ -67,13 +87,41 @@ export default function Navbar() {
                             >
                                 History
                             </Link>
+                            <Link
+                                href="/iso-docs"
+                                className={`btn btn-outline ${isActive("/iso-docs") ? "active-link" : ""}`}
+                                style={{ border: "none", padding: "0.5rem 1rem" }}
+                            >
+                                ISO Docs
+                            </Link>
                             {(session.user.role === "ADMIN" || session.user.role === "INSPECTOR") && (
                                 <Link
                                     href="/admin/approval"
                                     className={`btn btn-outline ${isActive("/admin/approval") ? "active-link" : ""}`}
-                                    style={{ border: "none", padding: "0.5rem 1rem" }}
+                                    style={{ border: "none", padding: "0.5rem 1rem", position: "relative" }}
                                 >
                                     Approvals
+                                    {pendingCount > 0 && (
+                                        <span style={{
+                                            position: "absolute",
+                                            top: "0",
+                                            right: "0",
+                                            transform: "translate(30%, -30%)",
+                                            backgroundColor: "var(--color-danger, #ef4444)",
+                                            color: "white",
+                                            fontSize: "0.7rem",
+                                            fontWeight: "bold",
+                                            minWidth: "18px",
+                                            height: "18px",
+                                            borderRadius: "9px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            padding: "0 4px"
+                                        }}>
+                                            {pendingCount > 99 ? '99+' : pendingCount}
+                                        </span>
+                                    )}
                                 </Link>
                             )}
                             {session.user.role === "ADMIN" && (

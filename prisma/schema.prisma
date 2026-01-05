@@ -15,6 +15,12 @@ model User {
   username  String   @unique
   password  String
   role      String   @default("VIEWER") // ADMIN, EDITOR, VIEWER, INSPECTOR
+  
+  // Qualifications
+  isQC          Boolean  @default(false)
+  isPM          Boolean  @default(false)
+  signaturePath String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -29,6 +35,10 @@ model User {
   reviewedFileRequests  DataFileChangeRequest[] @relation("FileReviewedBy")
   submittedFileHistories DataFileHistory[] @relation("FileHistorySubmitter")
   reviewedFileHistories  DataFileHistory[] @relation("FileHistoryReviewer")
+  
+  // QC Document Approval relations
+  qcApprovals QCDocumentApproval[] @relation("QCApprover")
+  pmApprovals QCDocumentApproval[] @relation("PMApprover")
 }
 
 model Project {
@@ -74,11 +84,27 @@ model Item {
   // ChangeRequests for creating NEW children under this item
   newChildRequests ChangeRequest[] @relation("TargetParent")
 
-  // Related Items (Many-to-Many Self Relation)
-  relatedItems    Item[] @relation("ItemRelations")
-  relatedToItems  Item[] @relation("ItemRelations")
+  // Related Items (Explicit Many-to-Many with description)
+  relationsFrom ItemRelation[] @relation("RelationSource")
+  relationsTo   ItemRelation[] @relation("RelationTarget")
   
   history ItemHistory[]
+}
+
+// Explicit relation table for Related Items with description
+model ItemRelation {
+  id          Int      @id @default(autoincrement())
+  sourceId    Int
+  targetId    Int
+  description String?  // 關聯描述
+  createdAt   DateTime @default(now())
+  
+  source      Item     @relation("RelationSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target      Item     @relation("RelationTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  
+  @@unique([sourceId, targetId])
+  @@index([sourceId])
+  @@index([targetId])
 }
 
 model ChangeRequest {
@@ -143,8 +169,38 @@ model ItemHistory {
   
   createdAt     DateTime @default(now())
   
+  isoDocPath    String?  // Path to the generated ISO QC document
+  
+  qcApproval    QCDocumentApproval?
+  
   @@index([itemId, version])
   @@index([itemId, createdAt])
+}
+
+// ============================================
+// QC Document Approval Workflow
+// ============================================
+
+model QCDocumentApproval {
+  id              Int      @id @default(autoincrement())
+  
+  itemHistoryId   Int      @unique
+  itemHistory     ItemHistory @relation(fields: [itemHistoryId], references: [id])
+  
+  status          String   @default("PENDING_QC") // PENDING_QC, PENDING_PM, COMPLETED, REJECTED
+  
+  qcApprovedById  String?
+  qcApprovedBy    User?    @relation("QCApprover", fields: [qcApprovedById], references: [id])
+  qcApprovedAt    DateTime?
+  qcNote          String?
+  
+  pmApprovedById  String?
+  pmApprovedBy    User?    @relation("PMApprover", fields: [pmApprovedById], references: [id])
+  pmApprovedAt    DateTime?
+  pmNote          String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 // ============================================

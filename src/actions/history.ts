@@ -2,13 +2,14 @@
 
 import { prisma } from "@/lib/prisma";
 import { Item, Prisma } from "@prisma/client";
+import { generateQCDocument } from "@/lib/pdf-generator";
 
 // Define Snapshot structure
 export interface ItemSnapshot {
     title: string;
     content: string | null;
     attachments: string | null;
-    relatedItems: { id: number; fullId: string }[];
+    relatedItems: { id: number; fullId: string; title?: string; description?: string | null }[];
 }
 
 /**
@@ -51,6 +52,7 @@ export async function createHistoryRecord(
     reviewerId: string,
     oldSnapshot?: ItemSnapshot
 ) {
+    console.log('=== createHistoryRecord CALLED ===', { itemId: item.id, changeType, changeRequestId: changeRequest.id });
     const diff = (changeType === "UPDATE" && oldSnapshot)
         ? computeDiff(oldSnapshot, snapshotData)
         : null;
@@ -63,7 +65,7 @@ export async function createHistoryRecord(
     }
 
     // Create History Record
-    await prisma.itemHistory.create({
+    const historyRecord = await prisma.itemHistory.create({
         data: {
             itemId: item.id, // Support soft delete linking
             version: newVersion,
@@ -82,6 +84,47 @@ export async function createHistoryRecord(
             projectId: item.projectId,
         }
     });
+
+    try {
+        console.log('[createHistoryRecord] Fetching full history for PDF generation, historyId:', historyRecord.id);
+        // Fetch full history with relations for PDF generation
+        const fullHistory = await prisma.itemHistory.findUnique({
+            where: { id: historyRecord.id },
+            include: {
+                submittedBy: { select: { username: true } },
+                reviewedBy: { select: { username: true } },
+                project: { select: { title: true } }
+            }
+        });
+        console.log('[createHistoryRecord] fullHistory fetched:', fullHistory ? 'OK' : 'NULL');
+
+        if (fullHistory) {
+            console.log('[createHistoryRecord] Calling generateQCDocument...');
+            // @ts-ignore - Types compatibility
+            const pdfPath = await generateQCDocument(fullHistory, item);
+            console.log('[createHistoryRecord] PDF generated at:', pdfPath);
+
+            // Save path to history record
+            await prisma.itemHistory.update({
+                where: { id: historyRecord.id },
+                data: { isoDocPath: pdfPath }
+            });
+            console.log('[createHistoryRecord] isoDocPath saved to history');
+
+            // Create QC Document Approval record to start the signature workflow
+            await prisma.qCDocumentApproval.create({
+                data: {
+                    itemHistoryId: historyRecord.id,
+                    status: "PENDING_QC"
+                }
+            });
+            console.log('[createHistoryRecord] QCDocumentApproval record created');
+        }
+    } catch (e) {
+        console.error("[createHistoryRecord] Failed to generate QC document:", e);
+        // Don't fail the whole transaction? Or should we?
+        // For now, log error but allow history creation
+    }
 
     // Increment Item Version (Only if not DELETE - conceptually. Practically, if soft delete, we might want to update version too? 
     // If we update version on soft delete, next time we recreate/restore, we know where we left off?
@@ -261,6 +304,7 @@ export async function getRecentUpdates(limit = 100) {
         orderBy: { createdAt: 'desc' },
         include: {
             submittedBy: { select: { username: true } },
+            reviewedBy: { select: { username: true } },
             project: { select: { title: true } }
         }
     });
@@ -270,7 +314,8 @@ export async function getRecentUpdates(limit = 100) {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-            submittedBy: { select: { username: true } }
+            submittedBy: { select: { username: true } },
+            reviewedBy: { select: { username: true } }
         }
     });
 
@@ -283,7 +328,9 @@ export async function getRecentUpdates(limit = 100) {
         name: h.itemTitle,
         projectTitle: h.project?.title || '',
         submittedBy: h.submittedBy.username,
-        createdAt: h.createdAt
+        reviewedBy: h.reviewedBy?.username || null,
+        createdAt: h.createdAt,
+        targetId: h.itemId
     }));
 
     const fileUpdates = fileHistories.map(h => ({
@@ -294,7 +341,9 @@ export async function getRecentUpdates(limit = 100) {
         name: h.dataName,
         projectTitle: `${h.dataYear}年度`,
         submittedBy: h.submittedBy.username,
-        createdAt: h.createdAt
+        reviewedBy: h.reviewedBy?.username || null,
+        createdAt: h.createdAt,
+        targetId: h.fileId
     }));
 
     // 4. 合併並排序，取前 limit 筆
@@ -303,5 +352,22 @@ export async function getRecentUpdates(limit = 100) {
         .slice(0, limit);
 
     return combined;
+}
+
+/**
+ * Get all available ISO QC Documents
+ */
+export async function getIsoDocuments() {
+    return await prisma.itemHistory.findMany({
+        where: {
+            isoDocPath: { not: null }
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+            item: { select: { fullId: true, title: true } },
+            submittedBy: { select: { username: true } },
+            reviewedBy: { select: { username: true } }
+        }
+    });
 }
 

@@ -12,6 +12,7 @@
 | Phase 4 | UI 優化與測試 | ✅ 完成 |
 | Phase 5 | 檔案管理系統 | ✅ 完成 |
 | Phase 6 | 部署準備與優化 | ✅ 完成 |
+| Phase 7 | 品質文件數位簽章 | ✅ 完成 |
 
 ---
 
@@ -133,6 +134,38 @@
 
 ---
 
+## Phase 7: 品質文件數位簽章 (v1.0.0) ✅
+
+### Phase 7.1: 使用者資格設定 ✅
+
+- [x] User 模型新增 `isQC`, `isPM`, `signaturePath` 欄位
+- [x] 使用者管理頁面支援設定 QC/PM 資格與簽名上傳
+
+### Phase 7.2: QCDocumentApproval 模型 ✅
+
+- [x] 新增 `QCDocumentApproval` 資料表
+- [x] 狀態流程: PENDING_QC → PENDING_PM → COMPLETED / REJECTED
+
+### Phase 7.3: 後端審核 Actions ✅
+
+- [x] `src/actions/qc-approval.ts` - 審核流程邏輯
+- [x] `approveAsQC()` / `approveAsPM()` / `rejectQCDocument()`
+- [x] 審核時自動嵌入數位簽名至 PDF
+
+### Phase 7.4: 前端整合 ✅
+
+- [x] `/admin/approval` 頁面新增「品質文件審核」區塊
+- [x] `QCDocumentApprovalList.tsx` 元件
+- [x] 根據使用者資格顯示待審核文件
+
+### Phase 7.5: PDF 生成優化 ✅
+
+- [x] 改用 `pdf-lib` 取代 `pdfkit` (解決 Next.js 相容性問題)
+- [x] 使用 Puppeteer 截圖渲染富文本內容
+- [x] 簽名圖片嵌入與位置調整
+
+---
+
 ## 已完成功能總覽
 
 - ✅ 專案與項目 CRUD
@@ -147,5 +180,8 @@
 - ✅ 專案搜尋 (關鍵字高亮)
 - ✅ 項目歷史與版本比較
 - ✅ 全域變更歷史 Dashboard
+- ✅ ISO 品質文件生成
+- ✅ 品質文件數位簽章 (QC/PM 兩階段審核)
+- ✅ PDF 內容截圖渲染 (Puppeteer)
 - ✅ 中文化介面
 - ✅ Docker 部署配置

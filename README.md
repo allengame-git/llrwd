@@ -18,6 +18,9 @@ RMS 是一個基於 Next.js 開發的專案項目資訊管理系統，提供階�
 - 📎 **檔案附件** - 支援 PDF、Word、圖片上傳
 - 📄 **檔案管理系統** - 獨立檔案管理模組，支援拖放上傳 (100MB)、年份分類、卡片/清單雙視圖、排序、搜尋、審核流程與前後比較
 - 🕰️ **項目歷史紀錄** - 完整記錄項目的建立、變更與刪除歷史，支援版本比對 (Diff) 與快照檢視
+- 📄 **ISO 品質文件生成** - 項目變更審核通過後自動生成 PDF 品質紀錄單，支援線上預覽與下載，提供獨立管理介面
+- ✍️ **品質文件數位簽章** - 兩階段審核流程 (QC 審核 → PM 核定)，自動嵌入 QC/PM 數位簽名至 PDF
+- 🖼️ **PDF 內容截圖** - 使用 Puppeteer 將富文本內容渲染為圖片嵌入 PDF，保留完整格式
 - 📊 **全域變更歷史** - 提供全域變更歷史 Dashboard，最近更新紀錄 (最新100筆，支援篩選項目/檔案)
 - 🎨 **統一 UI 設計** - 所有對話框採用 glass modal 設計，backdrop blur 效果，中文化介面
 - 🌓 **主題切換** - 淺色/深色模式
@@ -34,6 +37,8 @@ RMS 是一個基於 Next.js 開發的專案項目資訊管理系統，提供階�
 | 資料庫 | Prisma + SQLite |
 | 認證 | NextAuth.js |
 | 編輯器 | Tiptap (ProseMirror) |
+| PDF 生成 | pdf-lib + @pdf-lib/fontkit |
+| 內容截圖 | Puppeteer |
 | 樣式 | Vanilla CSS + CSS Variables |
 | 部署 | Docker + Nginx |
 
@@ -98,7 +103,8 @@ src/
 │   ├── admin/             # 管理後台 (審核、使用者、歷史)
 │   ├── projects/          # 專案頁面
 │   ├── items/             # 項目頁面
-│   └── datafiles/         # 檔案管理頁面
+│   ├── datafiles/         # 檔案管理頁面
+│   └── iso-docs/          # ISO 品質文件頁面
 ├── actions/               # Server Actions
 ├── components/            # React 元件
 │   ├── editor/           # 富文本編輯器

@@ -75,21 +75,66 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
         return Object.entries(diffData).map(([key, value]: [string, any]) => {
             // For 'content' field, render as rich text HTML
             const isHtmlContent = key === 'content';
+            // For 'relatedItems' field, render as card list
+            const isRelatedItems = key === 'relatedItems';
+
+            // Helper to render related items list with full content
+            const renderRelatedItemsList = (items: { id: number; fullId: string; title?: string; description?: string }[] | null) => {
+                if (!items || items.length === 0) {
+                    return <em style={{ color: 'var(--color-text-muted)' }}>無關聯項目</em>;
+                }
+                return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {items.map((ri) => (
+                            <div key={ri.id} style={{
+                                padding: '0.75rem',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '6px',
+                                background: 'rgba(255,255,255,0.3)'
+                            }}>
+                                <div style={{ marginBottom: '0.25rem' }}>
+                                    <span style={{ fontFamily: 'var(--font-geist-mono)', fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                                        {ri.fullId}
+                                    </span>
+                                    {ri.title && (
+                                        <span style={{ marginLeft: '0.5rem', color: 'var(--color-text)' }}>
+                                            {ri.title}
+                                        </span>
+                                    )}
+                                </div>
+                                {ri.description && (
+                                    <div style={{
+                                        fontSize: '0.85rem',
+                                        color: 'var(--color-text-muted)',
+                                        paddingLeft: '0.5rem',
+                                        borderLeft: '2px solid var(--color-border)',
+                                        marginTop: '0.25rem'
+                                    }}>
+                                        {ri.description}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
 
             return (
                 <div key={key} style={{ marginBottom: '1.5rem', borderLeft: '3px solid var(--color-info)', paddingLeft: '1rem' }}>
                     <div style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                        {key}
+                        {key === 'relatedItems' ? '關聯項目' : key === 'content' ? '內容' : key === 'title' ? '標題' : key === 'attachments' ? '附件' : key}
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div style={{ background: 'rgba(255,0,0,0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,0,0,0.1)' }}>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--color-error)', fontWeight: 'bold', marginBottom: '0.5rem' }}>OLD</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-error)', fontWeight: 'bold', marginBottom: '0.5rem' }}>修改前</div>
                             {isHtmlContent ? (
                                 <div
                                     className="rich-text-content"
                                     style={{ fontSize: '0.9rem', maxHeight: '400px', overflow: 'auto' }}
-                                    dangerouslySetInnerHTML={{ __html: value.old || '<em>Empty</em>' }}
+                                    dangerouslySetInnerHTML={{ __html: value.old || '<em>空白</em>' }}
                                 />
+                            ) : isRelatedItems ? (
+                                renderRelatedItemsList(value.old)
                             ) : (
                                 <pre style={{ margin: 0, fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                                     {typeof value.old === 'object' ? JSON.stringify(value.old, null, 2) : String(value.old ?? '')}
@@ -97,13 +142,15 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                             )}
                         </div>
                         <div style={{ background: 'rgba(0,255,0,0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(0,255,0,0.1)' }}>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 'bold', marginBottom: '0.5rem' }}>NEW</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 'bold', marginBottom: '0.5rem' }}>修改後</div>
                             {isHtmlContent ? (
                                 <div
                                     className="rich-text-content"
                                     style={{ fontSize: '0.9rem', maxHeight: '400px', overflow: 'auto' }}
-                                    dangerouslySetInnerHTML={{ __html: value.new || '<em>Empty</em>' }}
+                                    dangerouslySetInnerHTML={{ __html: value.new || '<em>空白</em>' }}
                                 />
+                            ) : isRelatedItems ? (
+                                renderRelatedItemsList(value.new)
                             ) : (
                                 <pre style={{ margin: 0, fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                                     {typeof value.new === 'object' ? JSON.stringify(value.new, null, 2) : String(value.new ?? '')}
@@ -120,9 +167,8 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
             <div style={{ marginBottom: '1.5rem' }}>
                 <Link href={`/items/${record.itemId || ''}`} style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-                    &larr; Back to Item (Current)
+                    &larr; 返回項目
                 </Link>
-                {/* TODO: Link to Global History when available */}
             </div>
 
             {/* Header Card */}
@@ -130,42 +176,50 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                         <h1 style={{ marginBottom: '0.5rem' }}>
-                            Version Analysis: v{record.version}
+                            歷史版本: v{record.version}
                         </h1>
                         <h2 style={{ fontSize: '1.2rem', color: 'var(--color-text-muted)', fontWeight: 'normal' }}>
                             {record.itemFullId} - {record.itemTitle}
                         </h2>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                        <span style={{
-                            display: 'inline-block',
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '2rem',
-                            fontWeight: 'bold',
-                            fontSize: '0.9rem',
-                            backgroundColor: record.changeType === 'CREATE' ? 'var(--color-success-bg)' :
-                                record.changeType === 'UPDATE' ? 'var(--color-info-bg)' :
-                                    record.changeType === 'DELETE' ? 'var(--color-error-bg)' : 'var(--color-bg-secondary)',
-                            color: record.changeType === 'CREATE' ? 'var(--color-success)' :
-                                record.changeType === 'UPDATE' ? 'var(--color-info)' :
-                                    record.changeType === 'DELETE' ? 'var(--color-error)' : 'var(--color-text)',
-                        }}>
-                            {record.changeType}
-                        </span>
+
+                        {record.isoDocPath && (
+                            <div style={{ marginTop: '0.5rem' }}>
+                                <a
+                                    href={record.isoDocPath}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem',
+                                        fontSize: '0.85rem',
+                                        color: 'var(--color-primary)',
+                                        textDecoration: 'none',
+                                        border: '1px solid var(--color-primary)',
+                                        padding: '0.25rem 0.5rem',
+                                        borderRadius: '4px'
+                                    }}
+                                >
+                                    📄 品質文件
+                                </a>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '2rem', marginTop: '1.5rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', fontSize: '0.9rem' }}>
                     <div>
-                        <span style={{ display: 'block', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Submitted By</span>
+                        <span style={{ display: 'block', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>提交者</span>
                         <span style={{ fontWeight: 500 }}>{record.submittedBy.username}</span>
                     </div>
                     <div>
-                        <span style={{ display: 'block', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Reviewed By</span>
+                        <span style={{ display: 'block', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>核准者</span>
                         <span style={{ fontWeight: 500 }}>{record.reviewedBy?.username || '-'}</span>
                     </div>
                     <div>
-                        <span style={{ display: 'block', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Date</span>
+                        <span style={{ display: 'block', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>日期</span>
                         <span style={{ fontWeight: 500 }}>{new Date(record.createdAt).toLocaleString()}</span>
                     </div>
                 </div>
@@ -175,7 +229,7 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
             {diff && (
                 <div className="glass" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)', marginBottom: '2rem' }}>
                     <h3 style={{ marginBottom: '1.5rem', fontSize: '1.2rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-                        Changes Detected
+                        變更內容
                     </h3>
                     <div>
                         {renderDiff(diff)}
@@ -191,31 +245,39 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                     </h3>
 
                     <div style={{ marginBottom: '2rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>TITLE</label>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>標題</label>
                         <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>{previousSnapshot.title}</div>
                     </div>
 
                     <div style={{ marginBottom: '2rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>CONTENT</label>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>內容</label>
                         <div className="rich-text-content" style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.5)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}
-                            dangerouslySetInnerHTML={{ __html: previousSnapshot.content || '<span style="color:gray;font-style:italic">No content</span>' }}
+                            dangerouslySetInnerHTML={{ __html: previousSnapshot.content || '<span style="color:gray;font-style:italic">無內容</span>' }}
                         />
                     </div>
 
                     {previousSnapshot.attachments && (
                         <div style={{ marginBottom: '2rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>ATTACHMENTS</label>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>附件</label>
                             {renderAttachments(previousSnapshot.attachments)}
                         </div>
                     )}
 
                     {previousSnapshot.relatedItems && previousSnapshot.relatedItems.length > 0 && (
                         <div style={{ marginBottom: '2rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>RELATED ITEMS</label>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>關聯項目</label>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {previousSnapshot.relatedItems.map(ri => (
-                                    <div key={ri.id} style={{ padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'rgba(255,255,255,0.3)' }}>
-                                        <span style={{ fontFamily: 'var(--font-geist-mono)', fontWeight: 'bold', color: 'var(--color-primary)' }}>{ri.fullId}</span>
+                                    <div key={ri.id} style={{ padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: '6px', background: 'rgba(255,255,255,0.3)' }}>
+                                        <div style={{ marginBottom: '0.25rem' }}>
+                                            <span style={{ fontFamily: 'var(--font-geist-mono)', fontWeight: 'bold', color: 'var(--color-primary)' }}>{ri.fullId}</span>
+                                            {(ri as any).title && <span style={{ marginLeft: '0.5rem' }}>{(ri as any).title}</span>}
+                                        </div>
+                                        {(ri as any).description && (
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', paddingLeft: '0.5rem', borderLeft: '2px solid var(--color-border)', marginTop: '0.25rem' }}>
+                                                {(ri as any).description}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>

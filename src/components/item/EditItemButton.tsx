@@ -12,6 +12,8 @@ interface RelatedItem {
     fullId: string;
     title: string;
     projectId: number;
+    projectTitle?: string;
+    description?: string | null;
 }
 
 interface EditItemButtonProps {
@@ -20,7 +22,16 @@ interface EditItemButtonProps {
         title: string;
         content: string | null;
         attachments: string | null;
-        relatedItems?: RelatedItem[];
+        relationsFrom?: Array<{
+            description: string | null;
+            target: {
+                id: number;
+                fullId: string;
+                title: string;
+                projectId: number;
+                project: { title: string };
+            };
+        }>;
     };
     isDisabled?: boolean;
 }
@@ -32,7 +43,16 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
     const [attachments, setAttachments] = useState<any[]>(
         item.attachments ? JSON.parse(item.attachments) : []
     );
-    const [relatedItems, setRelatedItems] = useState<RelatedItem[]>(item.relatedItems || []);
+    // Transform relationsFrom to RelatedItem format
+    const initialRelatedItems: RelatedItem[] = (item.relationsFrom || []).map(r => ({
+        id: r.target.id,
+        fullId: r.target.fullId,
+        title: r.target.title,
+        projectId: r.target.projectId,
+        projectTitle: r.target.project.title,
+        description: r.description
+    }));
+    const [relatedItems, setRelatedItems] = useState<RelatedItem[]>(initialRelatedItems);
     const [status, setStatus] = useState<{ message?: string; error?: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -48,7 +68,14 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
             setTitle(item.title);
             setContent(item.content || "");
             setAttachments(item.attachments ? JSON.parse(item.attachments) : []);
-            setRelatedItems(item.relatedItems || []);
+            setRelatedItems((item.relationsFrom || []).map(r => ({
+                id: r.target.id,
+                fullId: r.target.fullId,
+                title: r.target.title,
+                projectId: r.target.projectId,
+                projectTitle: r.target.project.title,
+                description: r.description
+            })));
             setStatus(null);
         }
     }, [isModalOpen, item]);
@@ -106,7 +133,7 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
                 border: "1px solid var(--color-border)"
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: "1.5rem" }}>
-                    <h2 style={{ margin: 0 }}>Edit Item: {item.title}</h2>
+                    <h2 style={{ margin: 0 }}>編輯項目</h2>
                     <button
                         type="button"
                         onClick={() => setIsModalOpen(false)}
@@ -138,7 +165,7 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
 
                 <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem", flex: 1 }}>
                     <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Title</label>
+                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>標題</label>
                         <input
                             type="text"
                             required
@@ -153,7 +180,7 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
                     </div>
 
                     <div style={{ flex: 1, minHeight: "300px", display: "flex", flexDirection: "column" }}>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Content</label>
+                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>內容</label>
                         <div style={{
                             flex: 1, border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
                             overflow: "hidden", background: "white" // Force white background for editor visibility
@@ -163,7 +190,7 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
                     </div>
 
                     <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>Attachments</label>
+                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>附件</label>
                         <FileUploader onFilesChange={setAttachments} initialFiles={attachments} />
                     </div>
 
@@ -183,14 +210,14 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
                             className="btn btn-outline"
                             disabled={isSubmitting}
                         >
-                            Cancel
+                            取消
                         </button>
                         <button
                             type="submit"
                             className="btn btn-primary"
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? "Submitting..." : "Request Changes"}
+                            {isSubmitting ? "提交中..." : "提交變更申請"}
                         </button>
                     </div>
                 </form>
@@ -207,7 +234,7 @@ export default function EditItemButton({ item, isDisabled = false }: EditItemBut
                 title={isDisabled ? "Changes pending approval" : "Request changes"}
                 style={{ opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
             >
-                Edit
+                編輯
             </button>
             {isModalOpen && mounted && typeof document !== 'undefined' && createPortal(modalContent, document.body)}
         </>

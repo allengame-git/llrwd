@@ -251,8 +251,12 @@ export async function getPendingRequests() {
                     title: true,
                     content: true,
                     attachments: true,
-                    relatedItems: {
-                        select: { id: true, fullId: true, title: true }
+                    relationsFrom: {
+                        include: {
+                            target: {
+                                select: { id: true, fullId: true, title: true }
+                            }
+                        }
                     }
                 }
             }
@@ -303,34 +307,38 @@ export async function approveRequest(requestId: number) {
                         : null,
                     projectId: request.targetProjectId,
                     parentId: request.targetParentId,
-                    publishedAt: new Date(), // Publish immediately upon approval for now
-                    relatedItems: data.relatedItems && data.relatedItems.length > 0 ? {
-                        connect: data.relatedItems.map((item: { id: number }) => ({ id: item.id }))
-                    } : undefined
+                    publishedAt: new Date(),
                 },
-                include: { relatedItems: { select: { id: true, fullId: true } } }
+                include: { relationsFrom: { include: { target: { select: { id: true, fullId: true } } } } }
             });
 
-            // Bidirectional Relation Sync for new item
+            // Handle related items via ItemRelation table
             if (data.relatedItems && data.relatedItems.length > 0) {
                 for (const rItem of data.relatedItems) {
-                    await prisma.item.update({
-                        where: { id: rItem.id },
-                        data: {
-                            relatedItems: {
-                                connect: { id: newItem.id }
-                            }
-                        }
-                    });
+                    // Create bidirectional relations
+                    try {
+                        await prisma.itemRelation.create({
+                            data: { sourceId: newItem.id, targetId: rItem.id, description: rItem.description || null }
+                        });
+                    } catch (e) { /* ignore duplicate */ }
+                    try {
+                        await prisma.itemRelation.create({
+                            data: { sourceId: rItem.id, targetId: newItem.id, description: rItem.description || null }
+                        });
+                    } catch (e) { /* ignore duplicate */ }
                 }
             }
 
             // HISTORY RECORD
+            const relationsForSnapshot = await prisma.itemRelation.findMany({
+                where: { sourceId: newItem.id },
+                include: { target: { select: { id: true, fullId: true, title: true } } }
+            });
             const snapshot: ItemSnapshot = {
                 title: newItem.title,
                 content: newItem.content,
                 attachments: newItem.attachments,
-                relatedItems: newItem.relatedItems
+                relatedItems: relationsForSnapshot.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
             };
 
             await createHistoryRecord(newItem, snapshot, { id: request.id, submittedById: request.submittedById }, "CREATE", session.user.id);
@@ -339,9 +347,12 @@ export async function approveRequest(requestId: number) {
             if (!request.itemId) throw new Error("Missing target item ID");
 
             // Fetch original for history
+            const originalRelations = await prisma.itemRelation.findMany({
+                where: { sourceId: request.itemId },
+                include: { target: { select: { id: true, fullId: true, title: true } } }
+            });
             const originalItem = await prisma.item.findUnique({
-                where: { id: request.itemId },
-                include: { relatedItems: { select: { id: true, fullId: true } } }
+                where: { id: request.itemId }
             });
             if (!originalItem) throw new Error("Original item not found");
 
@@ -349,7 +360,7 @@ export async function approveRequest(requestId: number) {
                 title: originalItem.title,
                 content: originalItem.content,
                 attachments: originalItem.attachments,
-                relatedItems: originalItem.relatedItems
+                relatedItems: originalRelations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
             };
 
             await prisma.item.update({
@@ -358,39 +369,51 @@ export async function approveRequest(requestId: number) {
                     title: data.title,
                     content: data.content,
                     attachments: data.attachments ? JSON.stringify(data.attachments) : undefined,
-                    updatedAt: new Date(),
-                    // Handle related items: disconnect all, then connect new ones
-                    relatedItems: data.relatedItems ? {
-                        set: data.relatedItems.map((ri: { id: number }) => ({ id: ri.id }))
-                    } : undefined
+                    updatedAt: new Date()
                 }
             });
 
-            // Handle symmetric relations if relatedItems changed
+            // Handle related items via ItemRelation table if provided
             if (data.relatedItems) {
+                // Delete existing relations
+                await prisma.itemRelation.deleteMany({
+                    where: {
+                        OR: [
+                            { sourceId: request.itemId },
+                            { targetId: request.itemId }
+                        ]
+                    }
+                });
+
+                // Create new relations
                 for (const rItem of data.relatedItems) {
-                    await prisma.item.update({
-                        where: { id: rItem.id },
-                        data: {
-                            relatedItems: {
-                                connect: { id: request.itemId }
-                            }
-                        }
-                    });
+                    try {
+                        await prisma.itemRelation.create({
+                            data: { sourceId: request.itemId, targetId: rItem.id, description: rItem.description || null }
+                        });
+                    } catch (e) { /* ignore duplicate */ }
+                    try {
+                        await prisma.itemRelation.create({
+                            data: { sourceId: rItem.id, targetId: request.itemId, description: rItem.description || null }
+                        });
+                    } catch (e) { /* ignore duplicate */ }
                 }
             }
 
-            // Get Updated Item
+            // Get Updated Relations
+            const updatedRelations = await prisma.itemRelation.findMany({
+                where: { sourceId: request.itemId },
+                include: { target: { select: { id: true, fullId: true, title: true } } }
+            });
             const updatedItem = await prisma.item.findUnique({
-                where: { id: request.itemId },
-                include: { relatedItems: { select: { id: true, fullId: true } } }
+                where: { id: request.itemId }
             });
             if (updatedItem) {
                 const newSnapshot: ItemSnapshot = {
                     title: updatedItem.title,
                     content: updatedItem.content,
                     attachments: updatedItem.attachments,
-                    relatedItems: updatedItem.relatedItems
+                    relatedItems: updatedRelations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
                 };
 
                 await createHistoryRecord(updatedItem, newSnapshot, { id: request.id, submittedById: request.submittedById }, "UPDATE", session.user.id, oldSnapshot);
@@ -405,17 +428,31 @@ export async function approveRequest(requestId: number) {
 
             // Fetch for history
             const item = await prisma.item.findUnique({
-                where: { id: request.itemId },
-                include: { relatedItems: { select: { id: true, fullId: true } } }
+                where: { id: request.itemId }
             });
             if (!item) throw new Error("Item not found");
+
+            const relations = await prisma.itemRelation.findMany({
+                where: { sourceId: request.itemId },
+                include: { target: { select: { id: true, fullId: true, title: true } } }
+            });
 
             const lastSnapshot: ItemSnapshot = {
                 title: item.title,
                 content: item.content,
                 attachments: item.attachments,
-                relatedItems: item.relatedItems
+                relatedItems: relations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
             };
+
+            // Delete relations first
+            await prisma.itemRelation.deleteMany({
+                where: {
+                    OR: [
+                        { sourceId: request.itemId },
+                        { targetId: request.itemId }
+                    ]
+                }
+            });
 
             await prisma.item.update({
                 where: { id: request.itemId },

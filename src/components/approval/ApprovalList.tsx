@@ -7,6 +7,7 @@ type RelatedItem = {
     id: number;
     fullId: string;
     title: string;
+    description?: string | null;
 };
 
 type Request = {
@@ -23,8 +24,28 @@ type Request = {
         title: string;
         content: string | null;
         attachments: string | null;
-        relatedItems: RelatedItem[];
+        relationsFrom: Array<{
+            description: string | null;
+            target: { id: number; fullId: string; title: string };
+        }>;
     } | null;
+};
+
+// Helper to transform relationsFrom to relatedItems format
+const getItemRelatedItems = (item: Request['item']): RelatedItem[] => {
+    if (!item?.relationsFrom) return [];
+    return item.relationsFrom.map(r => ({
+        id: r.target.id,
+        fullId: r.target.fullId,
+        title: r.target.title,
+        description: r.description
+    }));
+};
+
+const getComparableRelated = (items: RelatedItem[]) => {
+    return items
+        .map(r => ({ id: r.id, desc: r.description || '' }))
+        .sort((a: { id: number }, b: { id: number }) => a.id - b.id);
 };
 
 export default function ApprovalList({ requests, currentUsername }: { requests: Request[]; currentUsername: string }) {
@@ -271,8 +292,8 @@ export default function ApprovalList({ requests, currentUsername }: { requests: 
                                         const currentAttachments = req.item?.attachments ? JSON.parse(req.item.attachments) : [];
                                         const proposedAttachments = data.attachments || [];
                                         if (JSON.stringify(currentAttachments) !== JSON.stringify(proposedAttachments)) modified.push("附件");
-                                        const currentRelated = req.item?.relatedItems?.map((r: RelatedItem) => r.id).sort() || [];
-                                        const proposedRelated = (data.relatedItems || []).map((r: RelatedItem) => r.id).sort();
+                                        const currentRelated = getComparableRelated(getItemRelatedItems(req.item));
+                                        const proposedRelated = getComparableRelated(data.relatedItems || []);
                                         if (JSON.stringify(currentRelated) !== JSON.stringify(proposedRelated)) modified.push("關聯項目");
                                         return modified.length > 0 ? modified.join("、") : "無變更";
                                     })()}
@@ -425,19 +446,19 @@ export default function ApprovalList({ requests, currentUsername }: { requests: 
                             )}
 
                             {/* Related Items Section */}
-                            {((data.relatedItems?.length ?? 0) > 0 || (req.type === "UPDATE" && (req.item?.relatedItems?.length ?? 0) > 0)) && (
+                            {((data.relatedItems?.length ?? 0) > 0 || (req.type === "UPDATE" && getItemRelatedItems(req.item).length > 0)) && (
                                 <div style={{ marginBottom: "1.5rem" }}>
                                     <strong style={{ display: "block", marginBottom: "0.5rem" }}>
                                         關聯項目 {req.type === "UPDATE" && (() => {
-                                            const currIds = (req.item?.relatedItems || []).map((r: RelatedItem) => r.id).sort();
-                                            const propIds = (data.relatedItems || []).map((r: RelatedItem) => r.id).sort();
+                                            const currIds = getComparableRelated(getItemRelatedItems(req.item));
+                                            const propIds = getComparableRelated(data.relatedItems || []);
                                             return JSON.stringify(currIds) !== JSON.stringify(propIds);
                                         })() && (
                                                 <span style={{ color: "var(--color-warning)", fontSize: "0.85rem" }}>• 已修改</span>
                                             )}
                                     </strong>
                                     <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-                                        {req.type === "UPDATE" && req.item?.relatedItems && req.item.relatedItems.length > 0 && (
+                                        {req.type === "UPDATE" && getItemRelatedItems(req.item).length > 0 && (
                                             <div style={{
                                                 flex: 1,
                                                 minWidth: "200px",
@@ -446,10 +467,17 @@ export default function ApprovalList({ requests, currentUsername }: { requests: 
                                                 borderRadius: "var(--radius-sm)",
                                                 border: "1px solid var(--color-border)"
                                             }}>
-                                                <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem" }}>修改前 ({req.item.relatedItems.length})</div>
-                                                {req.item.relatedItems.map((ri: RelatedItem) => (
-                                                    <div key={ri.id} style={{ fontSize: "0.9rem", marginBottom: "0.25rem" }}>
-                                                        <span style={{ fontFamily: "var(--font-geist-mono)", color: "var(--color-primary)" }}>{ri.fullId}</span> {ri.title}
+                                                <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem" }}>修改前 ({getItemRelatedItems(req.item).length})</div>
+                                                {getItemRelatedItems(req.item).map((ri: RelatedItem) => (
+                                                    <div key={ri.id} style={{ fontSize: "0.9rem", marginBottom: "0.5rem" }}>
+                                                        <div>
+                                                            <span style={{ fontFamily: "var(--font-geist-mono)", color: "var(--color-primary)" }}>{ri.fullId}</span> {ri.title}
+                                                        </div>
+                                                        {ri.description && (
+                                                            <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted)", marginTop: "0.25rem", paddingLeft: "0.5rem", borderLeft: "2px solid var(--color-border)" }}>
+                                                                {ri.description}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -460,15 +488,15 @@ export default function ApprovalList({ requests, currentUsername }: { requests: 
                                             padding: "0.75rem",
                                             backgroundColor: (() => {
                                                 if (req.type !== "UPDATE") return "rgba(0,0,0,0.03)";
-                                                const currIds = (req.item?.relatedItems || []).map((r: RelatedItem) => r.id).sort();
-                                                const propIds = (data.relatedItems || []).map((r: RelatedItem) => r.id).sort();
+                                                const currIds = getComparableRelated(getItemRelatedItems(req.item));
+                                                const propIds = getComparableRelated(data.relatedItems || []);
                                                 return JSON.stringify(currIds) !== JSON.stringify(propIds) ? "rgba(34, 197, 94, 0.1)" : "rgba(0,0,0,0.03)";
                                             })(),
                                             borderRadius: "var(--radius-sm)",
                                             border: (() => {
                                                 if (req.type !== "UPDATE") return "1px solid var(--color-border)";
-                                                const currIds = (req.item?.relatedItems || []).map((r: RelatedItem) => r.id).sort();
-                                                const propIds = (data.relatedItems || []).map((r: RelatedItem) => r.id).sort();
+                                                const currIds = getComparableRelated(getItemRelatedItems(req.item));
+                                                const propIds = getComparableRelated(data.relatedItems || []);
                                                 return JSON.stringify(currIds) !== JSON.stringify(propIds) ? "1px solid var(--color-success)" : "1px solid var(--color-border)";
                                             })()
                                         }}>
@@ -477,8 +505,15 @@ export default function ApprovalList({ requests, currentUsername }: { requests: 
                                             </div>
                                             {(data.relatedItems || []).length > 0 ? (
                                                 (data.relatedItems || []).map((ri: RelatedItem) => (
-                                                    <div key={ri.id} style={{ fontSize: "0.9rem", marginBottom: "0.25rem" }}>
-                                                        <span style={{ fontFamily: "var(--font-geist-mono)", color: "var(--color-primary)" }}>{ri.fullId}</span> {ri.title}
+                                                    <div key={ri.id} style={{ fontSize: "0.9rem", marginBottom: "0.5rem" }}>
+                                                        <div>
+                                                            <span style={{ fontFamily: "var(--font-geist-mono)", color: "var(--color-primary)" }}>{ri.fullId}</span> {ri.title}
+                                                        </div>
+                                                        {ri.description && (
+                                                            <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted)", marginTop: "0.25rem", paddingLeft: "0.5rem", borderLeft: "2px solid var(--color-border)" }}>
+                                                                {ri.description}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))
                                             ) : (

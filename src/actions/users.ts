@@ -23,6 +23,9 @@ export async function getUsers() {
             id: true,
             username: true,
             role: true,
+            isQC: true,
+            isPM: true,
+            signaturePath: true,
             createdAt: true,
         },
         orderBy: { createdAt: "desc" },
@@ -44,8 +47,12 @@ export async function createUser(prevState: UserState, formData: FormData): Prom
         return { error: "Missing required fields" };
     }
 
-    if (username.length < 3) return { error: "Username must be at least 3 characters" };
+    if (username.length < 2) return { error: "Username must be at least 2 characters" };
     if (password.length < 6) return { error: "Password must be at least 6 characters" };
+
+    const isQC = formData.get("isQC") === "true";
+    const isPM = formData.get("isPM") === "true";
+    const signaturePath = formData.get("signaturePath") as string;
 
     const existingUser = await prisma.user.findUnique({ where: { username } });
     if (existingUser) return { error: "Username already exists" };
@@ -58,6 +65,9 @@ export async function createUser(prevState: UserState, formData: FormData): Prom
                 username,
                 password: hashedPassword,
                 role,
+                isQC,
+                isPM,
+                signaturePath: signaturePath || null,
             },
         });
         revalidatePath("/admin/users");
@@ -71,7 +81,14 @@ export async function createUser(prevState: UserState, formData: FormData): Prom
 // --- UPDATE USER (Comprehensive) ---
 export async function updateUser(
     userId: string,
-    data: { username?: string; password?: string; role?: string }
+    data: {
+        username?: string;
+        password?: string;
+        role?: string;
+        isQC?: boolean;
+        isPM?: boolean;
+        signaturePath?: string;
+    }
 ): Promise<UserState> {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "ADMIN") return { error: "Unauthorized" };
@@ -80,7 +97,7 @@ export async function updateUser(
 
     // 1. Handle Username Update
     if (data.username) {
-        if (data.username.length < 3) return { error: "Username must be at least 3 characters" };
+        if (data.username.length < 2) return { error: "Username must be at least 2 characters" };
 
         // Check uniqueness excluding self
         const existing = await prisma.user.findFirst({
@@ -104,6 +121,11 @@ export async function updateUser(
         // Valid roles: VIEWER, EDITOR, INSPECTOR, ADMIN
         updates.role = data.role;
     }
+
+    // 4. Handle Qualifications
+    if (data.isQC !== undefined) updates.isQC = data.isQC;
+    if (data.isPM !== undefined) updates.isPM = data.isPM;
+    if (data.signaturePath !== undefined) updates.signaturePath = data.signaturePath;
 
     if (Object.keys(updates).length === 0) return { message: "No changes made" };
 

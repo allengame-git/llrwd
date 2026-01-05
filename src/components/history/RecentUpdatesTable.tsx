@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 type UpdateRecord = {
@@ -10,7 +11,9 @@ type UpdateRecord = {
     name: string;
     projectTitle: string;
     submittedBy: string;
+    reviewedBy: string | null;
     createdAt: Date;
+    targetId?: number | null;
 };
 
 // 相對時間格式化
@@ -161,6 +164,7 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
                                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>編號/名稱</th>
                                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>專案/年度</th>
                                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>提交者</th>
+                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>核准者</th>
                                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>時間</th>
                             </tr>
                         </thead>
@@ -201,13 +205,28 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             <div>
-                                                <span style={{
-                                                    fontFamily: 'var(--font-geist-mono)',
-                                                    color: 'var(--color-primary)',
-                                                    fontWeight: 600
-                                                }}>
-                                                    {update.identifier}
-                                                </span>
+                                                {update.targetId ? (
+                                                    <Link
+                                                        href={update.type === 'ITEM' ? `/items/${update.targetId}` : `/datafiles/${update.targetId}`}
+                                                        style={{
+                                                            fontFamily: 'var(--font-geist-mono)',
+                                                            color: 'var(--color-primary)',
+                                                            fontWeight: 600,
+                                                            textDecoration: 'none'
+                                                        }}
+                                                        className="hover:underline"
+                                                    >
+                                                        {update.identifier}
+                                                    </Link>
+                                                ) : (
+                                                    <span style={{
+                                                        fontFamily: 'var(--font-geist-mono)',
+                                                        color: 'var(--color-primary)',
+                                                        fontWeight: 600
+                                                    }}>
+                                                        {update.identifier}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div style={{
                                                 fontSize: '0.8rem',
@@ -218,7 +237,17 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
                                                 textOverflow: 'ellipsis',
                                                 whiteSpace: 'nowrap'
                                             }}>
-                                                {update.name}
+                                                {update.targetId ? (
+                                                    <Link
+                                                        href={update.type === 'ITEM' ? `/items/${update.targetId}` : `/datafiles/${update.targetId}`}
+                                                        style={{ color: 'inherit', textDecoration: 'none' }}
+                                                        className="hover:underline"
+                                                    >
+                                                        {update.name}
+                                                    </Link>
+                                                ) : (
+                                                    update.name
+                                                )}
                                             </div>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', color: 'var(--color-text-muted)' }}>
@@ -226,6 +255,9 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             {update.submittedBy}
+                                        </td>
+                                        <td style={{ padding: '0.75rem 1rem', color: update.reviewedBy ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+                                            {update.reviewedBy || '-'}
                                         </td>
                                         <td style={{
                                             padding: '0.75rem 1rem',

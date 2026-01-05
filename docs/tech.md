@@ -631,6 +631,207 @@ function CompareField({ label, current, proposed, isUpdate, mono, multiline }) {
 
 ---
 
+## Phase 7: 品質文件數位簽章 (v1.0.0)
+
+### 7.1 使用者資格系統
+
+**資料庫擴充**:
+
+```prisma
+model User {
+  // ... existing fields
+  isQC          Boolean  @default(false)  // QC 審核資格
+  isPM          Boolean  @default(false)  // PM 核定資格
+  signaturePath String?                   // 數位簽名圖片路徑
+}
+```
+
+**管理功能**:
+
+- `/admin/users` 頁面可設定使用者的 QC/PM 資格
+- 支援上傳數位簽名圖片 (PNG/JPG)
+- 只有具備對應資格的使用者才能審核品質文件
+
+### 7.2 QCDocumentApproval 模型
+
+**資料庫結構**:
+
+```prisma
+model QCDocumentApproval {
+  id              Int      @id @default(autoincrement())
+  
+  itemHistoryId   Int      @unique
+  itemHistory     ItemHistory @relation(fields: [itemHistoryId], references: [id])
+  
+  status          String   @default("PENDING_QC")
+  
+  qcApprovedById  String?
+  qcApprovedBy    User?    @relation("QCApprover", fields: [qcApprovedById], references: [id])
+  qcApprovedAt    DateTime?
+  qcNote          String?
+  
+  pmApprovedById  String?
+  pmApprovedBy    User?    @relation("PMApprover", fields: [pmApprovedById], references: [id])
+  pmApprovedAt    DateTime?
+  pmNote          String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+```
+
+**狀態流程**:
+
+| 狀態 | 說明 |
+|------|------|
+| `PENDING_QC` | 待 QC 審核 |
+| `PENDING_PM` | QC 已審核，待 PM 核定 |
+| `COMPLETED` | PM 已核定，流程完成 |
+| `REJECTED` | QC 或 PM 駁回 |
+
+### 7.3 後端審核 Actions
+
+**檔案**: `src/actions/qc-approval.ts`
+
+| 函數 | 說明 |
+|------|------|
+| `getQCDocumentApprovals()` | 根據使用者資格取得待審核文件 |
+| `approveAsQC(id, note?)` | QC 審核通過，嵌入簽名，轉為 PENDING_PM |
+| `approveAsPM(id, note?)` | PM 核定通過，嵌入簽名，轉為 COMPLETED |
+| `rejectQCDocument(id, note)` | 駁回文件 |
+
+**簽名嵌入流程**:
+
+```typescript
+// 審核通過後自動嵌入簽名
+const user = await prisma.user.findUnique({
+  where: { id: session.user.id },
+  select: { signaturePath: true }
+});
+
+if (user?.signaturePath) {
+  await embedSignatureInPDF(
+    approval.itemHistory.isoDocPath,
+    user.signaturePath,
+    "qc", // 或 "pm"
+    session.user.username
+  );
+}
+```
+
+### 7.4 PDF 生成技術優化
+
+**問題與解決**:
+
+| 問題 | 原因 | 解決方案 |
+|------|------|----------|
+| pdfkit 在 Next.js 中失敗 | pdfkit 嘗試載入 Helvetica.afm 字型檔 | 改用 `pdf-lib` 取代 pdfkit |
+| 中文顯示問題 | 預設字型不支援中文 | 使用 `@pdf-lib/fontkit` 嵌入 Arial Unicode 字型 |
+| 富文本格式遺失 | 純文字無法保留 HTML 格式 | 使用 Puppeteer 截圖渲染內容 |
+
+**PDF 生成核心套件**:
+
+- `pdf-lib`: 純 JavaScript PDF 生成/修改函式庫
+- `@pdf-lib/fontkit`: 字型嵌入支援
+- `puppeteer`: HTML 截圖渲染
+
+**檔案結構**:
+
+```
+src/lib/
+├── pdf-generator.ts      # PDF 生成 (pdf-lib)
+├── pdf-signature.ts      # 簽名嵌入
+└── html-renderer.ts      # HTML 截圖 (Puppeteer)
+```
+
+**HTML 截圖流程**:
+
+```typescript
+import puppeteer from 'puppeteer';
+
+export async function renderHtmlToImage(htmlContent: string, width: number): Promise<Buffer> {
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    
+    await page.setViewport({ width, height: 800, deviceScaleFactor: 2 });
+    await page.setContent(wrapWithStyles(htmlContent));
+    
+    const screenshot = await page.screenshot({ type: 'png' });
+    await browser.close();
+    
+    return screenshot;
+}
+```
+
+### 7.5 前端整合
+
+**審核頁面擴充** (`/admin/approval`):
+
+- 新增「品質文件審核」區塊
+- 只對 `isQC` 或 `isPM` 使用者顯示
+- 根據使用者資格顯示對應階段的待審核文件
+
+**元件結構**:
+
+```
+src/
+├── app/admin/approval/
+│   ├── page.tsx                      # 主頁面
+│   └── QCDocumentApprovalSection.tsx # QC 審核區塊 (Client)
+└── components/approval/
+    └── QCDocumentApprovalList.tsx    # 審核清單元件
+```
+
+---
+
+### 6.1 架構與流程
+
+**核心概念**:
+
+- **觸發時機**: 項目變更申請 (Create/Update/Delete) 被核准 (APPROVED) 時
+- **生成方式**: 後端非同步生成 PDF，不阻塞主要流程 (但需確保生成成功後更新 DB)
+- **儲存策略**: 產生靜態檔案至 `/public/iso_doc/`，資料庫儲存相對路徑
+
+**流程**:
+
+1. `approveRequest` (Server Action) 執行核准
+2. 寫入 `ItemHistory`
+3. 呼叫 `generateQCDocument` Service
+4. 使用 `pdfkit` 繪製 PDF (包含 Header, Content, Footer)
+5. 寫入檔案系統，回傳路徑
+6. 更新 `ItemHistory.isoDocPath`
+
+### 6.2 PDF 生成技術細節
+
+**核心套件**: `pdfkit`, `@types/pdfkit`
+
+**字體處理 (中文化關鍵)**:
+
+- **問題**: `pdfkit` 預設字體不支援中文，會顯示亂碼 (Mojibake)
+- **解決方案**: 使用系統內建中文字體 (macOS: `Arial Unicode.ttf` 或 `STHeiti`)
+- **Fallback**: 若找不到指定字體，嘗試降級或記錄警告
+
+**版面設計**:
+
+- **Header**: 專案變更品質管制紀錄單 (置中標題)
+- **Info Table**: 使用向量繪圖 (`doc.rect`, `doc.moveTo`) 繪製表格框線，包含編號、日期、專案、提交/審核者
+- **Content Box**: 獨立方框顯示變更內容，支援自動換行
+- **Signatures**: 底部簽核欄位 (QC Review / PM Approval)
+
+### 6.3 前端整合
+
+**History Detail Page**:
+
+- 檢查 `isoDocPath`，若存在則顯示「下載 PDF」連結
+
+**ISO Docs Management (`/iso-docs`)**:
+
+- 獨立頁面列出所有品質文件
+- **UI 設計**: 統一使用 History Table 風格 (清單模式)，移除卡片視圖以保持專業感
+- **功能**: 排序 (日期、編號、版本)、下載
+
+---
+
 ## 問題解決記錄
 
 ### 常見問題速查

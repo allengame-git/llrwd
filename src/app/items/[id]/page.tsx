@@ -21,19 +21,24 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
             project: true,
             parent: true,
             children: true,
-            relatedItems: {
-                select: {
-                    id: true,
-                    fullId: true,
-                    title: true,
-                    projectId: true,
-                    project: {
+            relationsFrom: {
+                include: {
+                    target: {
                         select: {
+                            id: true,
+                            fullId: true,
                             title: true,
-                            codePrefix: true
+                            projectId: true,
+                            project: {
+                                select: {
+                                    title: true,
+                                    codePrefix: true
+                                }
+                            }
                         }
                     }
-                }
+                },
+                orderBy: { createdAt: 'asc' }
             },
             history: {
                 orderBy: { createdAt: 'desc' },
@@ -47,6 +52,16 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
     });
 
     if (!item) return notFound();
+
+    // Transform relations to include description
+    const relatedItems = item.relationsFrom.map(r => ({
+        id: r.target.id,
+        fullId: r.target.fullId,
+        title: r.target.title,
+        projectId: r.target.projectId,
+        projectTitle: r.target.project.title,
+        description: r.description
+    }));
 
     // Fetch all items in the project to build the tree for sidebar
     const projectItems = await prisma.item.findMany({
@@ -74,7 +89,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
     return (
         <div style={{ paddingBottom: "4rem", maxWidth: "1400px", margin: "0 auto", padding: "0 2rem" }}>
             <div style={{ marginBottom: "1rem" }}>
-                <Link href={`/projects/${item.projectId}`} style={{ color: "var(--color-text-muted)", fontSize: "0.9rem" }}>&larr; Back to Project</Link>
+                <Link href={`/projects/${item.projectId}`} style={{ color: "var(--color-text-muted)", fontSize: "0.9rem" }}>&larr; 返回專案</Link>
             </div>
 
             <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
@@ -89,7 +104,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                     paddingRight: '1rem',
                     borderRight: '1px solid var(--color-border)'
                 }}>
-                    <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', color: 'var(--color-text-muted)' }}>Navigation</h3>
+                    <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', color: 'var(--color-text-muted)' }}>導覽</h3>
                     <ItemTree nodes={rootNodes} projectId={item.projectId} canEdit={canEdit} currentItemId={itemId} />
                 </div>
 
@@ -101,15 +116,15 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                                 <h1 style={{ marginBottom: "0.5rem" }}>{item.title}</h1>
                                 <div style={{ display: "flex", gap: "1rem", color: "var(--color-text-muted)", fontSize: "0.9rem" }}>
                                     <span style={{ fontFamily: "var(--font-geist-mono)", fontWeight: "bold", color: "var(--color-primary)" }}>{item.fullId}</span>
-                                    <span>Project: <Link href={`/projects/${item.project.id}`} className="hover:underline">{item.project.title}</Link></span>
+                                    <span>專案: <Link href={`/projects/${item.project.id}`} className="hover:underline">{item.project.title}</Link></span>
                                     {item.parent && (
-                                        <span>Parent: <Link href={`/items/${item.parent.id}`} className="hover:underline">{item.parent.fullId}</Link></span>
+                                        <span>父項目: <Link href={`/items/${item.parent.id}`} className="hover:underline">{item.parent.fullId}</Link></span>
                                     )}
                                 </div>
                             </div>
                             {canEdit && (
                                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                                    {isPending && <span style={{ color: "var(--color-warning)", fontSize: "0.9rem", marginRight: "0.5rem" }}>⚠️ Pending Approval</span>}
+                                    {isPending && <span style={{ color: "var(--color-warning)", fontSize: "0.9rem", marginRight: "0.5rem" }}>⚠️ 審核中</span>}
                                     <EditItemButton
                                         item={item}
                                         isDisabled={isPending}
@@ -130,22 +145,22 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                                 dangerouslySetInnerHTML={{ __html: item.content }}
                             />
                         ) : (
-                            <p style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>No content.</p>
+                            <p style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>尚無內容</p>
                         )}
                     </div>
 
-                    {/* Related Items Section (Read-only display) */}
-                    {item.relatedItems && item.relatedItems.length > 0 && (() => {
-                        // Group by project and sort
-                        type RelatedItemType = { id: number; fullId: string; title: string; projectId: number; project: { title: string; codePrefix: string } };
-                        const grouped = item.relatedItems.reduce((acc: Record<string, RelatedItemType[]>, ri: RelatedItemType) => {
-                            const key = ri.project.title;
+                    {/* Related Items Section with Description */}
+                    {relatedItems.length > 0 && (() => {
+                        // Group by project
+                        type RelatedItemType = { id: number; fullId: string; title: string; projectId: number; projectTitle: string; description: string | null };
+                        const grouped = relatedItems.reduce((acc: Record<string, RelatedItemType[]>, ri: RelatedItemType) => {
+                            const key = ri.projectTitle;
                             if (!acc[key]) acc[key] = [];
                             acc[key].push(ri);
                             return acc;
                         }, {} as Record<string, RelatedItemType[]>);
 
-                        // Natural sort function for fullId (WQ-1, WQ-2, WQ-2-1, WQ-10)
+                        // Natural sort function for fullId
                         const naturalSort = (a: string, b: string) => {
                             const aParts = a.split('-').map(p => isNaN(Number(p)) ? p : Number(p));
                             const bParts = b.split('-').map(p => isNaN(Number(p)) ? p : Number(p));
@@ -168,7 +183,12 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
 
                         return (
                             <div className="glass" style={{ padding: "2rem", borderRadius: "var(--radius-lg)", marginTop: "2rem" }}>
-                                <h3 style={{ marginBottom: "1rem", fontSize: "1.2rem" }}>Related Items</h3>
+                                <h3 style={{ marginBottom: "1rem", fontSize: "1.2rem", display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    📎 關聯項目
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: 'var(--color-text-muted)' }}>
+                                        ({relatedItems.length})
+                                    </span>
+                                </h3>
                                 {sortedProjects.map((projectTitle) => (
                                     <div key={projectTitle} style={{ marginBottom: "1.5rem" }}>
                                         <div style={{
@@ -181,28 +201,39 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                                         }}>
                                             📁 {projectTitle}
                                         </div>
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                                             {grouped[projectTitle].map((related: RelatedItemType) => (
                                                 <a
                                                     key={related.id}
                                                     href={`/items/${related.id}`}
                                                     style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "1rem",
-                                                        padding: "0.75rem",
-                                                        backgroundColor: "rgba(0,0,0,0.02)",
-                                                        borderRadius: "var(--radius-sm)",
+                                                        display: "block",
+                                                        padding: "1rem",
+                                                        backgroundColor: "var(--color-bg-elevated)",
+                                                        borderRadius: "var(--radius-md)",
                                                         border: "1px solid var(--color-border)",
                                                         textDecoration: "none",
                                                         color: "inherit",
                                                         transition: "all 0.2s"
                                                     }}
                                                 >
-                                                    <span style={{ fontWeight: "bold", fontFamily: "var(--font-geist-mono)", color: "var(--color-primary)" }}>
-                                                        {related.fullId}
-                                                    </span>
-                                                    <span>{related.title}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                        <span style={{ fontWeight: "bold", fontFamily: "var(--font-geist-mono)", color: "var(--color-primary)" }}>
+                                                            {related.fullId}
+                                                        </span>
+                                                        <span>{related.title}</span>
+                                                    </div>
+                                                    {related.description && (
+                                                        <div style={{
+                                                            marginTop: '0.5rem',
+                                                            fontSize: '0.85rem',
+                                                            color: 'var(--color-text-muted)',
+                                                            paddingLeft: '0.5rem',
+                                                            borderLeft: '2px solid var(--color-border)'
+                                                        }}>
+                                                            {related.description}
+                                                        </div>
+                                                    )}
                                                 </a>
                                             ))}
                                         </div>
