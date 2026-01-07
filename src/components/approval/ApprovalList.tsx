@@ -48,7 +48,7 @@ const getComparableRelated = (items: RelatedItem[]) => {
         .sort((a: { id: number }, b: { id: number }) => a.id - b.id);
 };
 
-export default function ApprovalList({ requests, currentUsername }: { requests: Request[]; currentUsername: string }) {
+export default function ApprovalList({ requests, currentUsername, currentUserRole }: { requests: Request[]; currentUsername: string; currentUserRole: string }) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [loading, setLoading] = useState<number | null>(null);
     const [confirmDialog, setConfirmDialog] = useState<{ id: number; action: 'approve' | 'reject' } | null>(null);
@@ -61,12 +61,14 @@ export default function ApprovalList({ requests, currentUsername }: { requests: 
     const handleApproveClick = (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
         const request = requests.find(r => r.id === id);
-        if (request && request.submittedBy.username === currentUsername) {
+        // ADMIN can approve their own requests, others cannot
+        if (request && request.submittedBy.username === currentUsername && currentUserRole !== 'ADMIN') {
             setErrorDialog('您不能批准自己提交的申請。請由其他審核人員處理。');
             return;
         }
         setConfirmDialog({ id, action: 'approve' });
     };
+
 
     const handleRejectClick = (e: React.MouseEvent, id: number) => {
         e.stopPropagation();

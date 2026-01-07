@@ -105,7 +105,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                     borderRight: '1px solid var(--color-border)'
                 }}>
                     <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', color: 'var(--color-text-muted)' }}>導覽</h3>
-                    <SidebarNav nodes={rootNodes} currentItemId={itemId} />
+                    <SidebarNav nodes={rootNodes} currentItemId={itemId} canEdit={canEdit} projectId={item.projectId} />
                 </div>
 
                 {/* Main Content */}

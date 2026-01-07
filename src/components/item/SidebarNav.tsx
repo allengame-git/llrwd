@@ -3,18 +3,21 @@
 import { ItemNode } from '@/lib/tree-utils';
 import Link from 'next/link';
 import { useState } from 'react';
+import CreateItemForm from './CreateItemForm';
 
 interface SidebarNavProps {
     nodes: ItemNode[];
     level?: number;
     currentItemId?: number;
+    canEdit?: boolean;
+    projectId?: number;
 }
 
 /**
  * Simplified sidebar navigator for item detail pages
  * Uses compact tree-style display without heavy accordion styling
  */
-export default function SidebarNav({ nodes, level = 0, currentItemId }: SidebarNavProps) {
+export default function SidebarNav({ nodes, level = 0, currentItemId, canEdit = false, projectId }: SidebarNavProps) {
     if (!nodes || nodes.length === 0) return null;
 
     return (
@@ -28,19 +31,25 @@ export default function SidebarNav({ nodes, level = 0, currentItemId }: SidebarN
                     node={node}
                     level={level}
                     currentItemId={currentItemId}
+                    canEdit={canEdit}
+                    projectId={projectId}
                 />
             ))}
         </div>
     );
 }
 
+
+
 interface SidebarNavItemProps {
     node: ItemNode;
     level: number;
     currentItemId?: number;
+    canEdit?: boolean;
+    projectId?: number;
 }
 
-function SidebarNavItem({ node, level, currentItemId }: SidebarNavItemProps) {
+function SidebarNavItem({ node, level, currentItemId, canEdit = false, projectId }: SidebarNavItemProps) {
     const hasChildren = node.children && node.children.length > 0;
     const [isExpanded, setIsExpanded] = useState(true);
     const isCurrentItem = currentItemId === node.id;
@@ -139,6 +148,42 @@ function SidebarNavItem({ node, level, currentItemId }: SidebarNavItemProps) {
                         {node.children.length}
                     </span>
                 )}
+
+                {/* Add Child Button */}
+                {canEdit && projectId && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <CreateItemForm
+                            projectId={projectId}
+                            parentId={node.id}
+                            modal={true}
+                            trigger={
+                                <button
+                                    title="新增子項目"
+                                    className="add-child-btn"
+                                    style={{
+                                        width: '20px',
+                                        height: '20px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderRadius: '4px',
+                                        border: '1px solid var(--color-border)',
+                                        background: 'var(--color-bg-surface)',
+                                        cursor: 'pointer',
+                                        color: 'var(--color-primary)',
+                                        fontSize: '0.9rem',
+                                        fontWeight: 'bold',
+                                        transition: 'all 0.15s ease',
+                                        flexShrink: 0,
+                                        opacity: 0.7,
+                                    }}
+                                >
+                                    +
+                                </button>
+                            }
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Children */}
@@ -147,6 +192,8 @@ function SidebarNavItem({ node, level, currentItemId }: SidebarNavItemProps) {
                     nodes={node.children}
                     level={level + 1}
                     currentItemId={currentItemId}
+                    canEdit={canEdit}
+                    projectId={projectId}
                 />
             )}
 
@@ -160,7 +207,11 @@ function SidebarNavItem({ node, level, currentItemId }: SidebarNavItemProps) {
                 .sidebar-item-link:hover span:last-child {
                     color: var(--color-primary);
                 }
+                .sidebar-nav-item:hover .add-child-btn {
+                    opacity: 1;
+                }
             `}</style>
         </div>
     );
 }
+

@@ -209,21 +209,117 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '2rem', marginTop: '1.5rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', fontSize: '0.9rem' }}>
-                    <div>
-                        <span style={{ display: 'block', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>提交者</span>
-                        <span style={{ fontWeight: 500 }}>{record.submittedBy.username}</span>
+                {/* Review Details Card */}
+                <div style={{
+                    marginTop: '1.5rem',
+                    background: 'rgba(0,131,143,0.03)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    overflow: 'hidden'
+                }}>
+                    <div style={{
+                        padding: '0.75rem 1rem',
+                        background: 'var(--color-primary)',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: '0.9rem'
+                    }}>
+                        📋 審查紀錄詳情
                     </div>
-                    <div>
-                        <span style={{ display: 'block', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>核准者</span>
-                        <span style={{ fontWeight: 500 }}>{record.reviewedBy?.username || '-'}</span>
+                    <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                        {/* Submitter Info */}
+                        <div style={{ borderLeft: '3px solid var(--chart-2)', paddingLeft: '1rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                                提交者
+                            </div>
+                            <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text-main)' }}>
+                                {record.submittedBy.username}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                                {new Date(record.createdAt).toLocaleString('zh-TW')}
+                            </div>
+                        </div>
+
+                        {/* Reviewer Info */}
+                        <div style={{ borderLeft: '3px solid var(--color-success)', paddingLeft: '1rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                                核准者
+                            </div>
+                            <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text-main)' }}>
+                                {record.reviewedBy?.username || '-'}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                                {record.reviewedBy ? new Date(record.createdAt).toLocaleString('zh-TW') : '-'}
+                            </div>
+                        </div>
+
+                        {/* QC Approval Info */}
+                        <div style={{ borderLeft: '3px solid var(--chart-4)', paddingLeft: '1rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                                QC 簽核
+                            </div>
+                            {record.qcApproval?.qcApprovedBy ? (
+                                <>
+                                    <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text-main)' }}>
+                                        {record.qcApproval.qcApprovedBy.username}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                                        {record.qcApproval.qcApprovedAt ? new Date(record.qcApproval.qcApprovedAt).toLocaleString('zh-TW') : '-'}
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>
+                                    {record.qcApproval ? (record.qcApproval.status === 'PENDING_QC' ? '待 QC 簽核' : '-') : '不適用'}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* PM Approval Info */}
+                        <div style={{ borderLeft: '3px solid var(--chart-1)', paddingLeft: '1rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                                PM 簽核
+                            </div>
+                            {record.qcApproval?.pmApprovedBy ? (
+                                <>
+                                    <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text-main)' }}>
+                                        {record.qcApproval.pmApprovedBy.username}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                                        {record.qcApproval.pmApprovedAt ? new Date(record.qcApproval.pmApprovedAt).toLocaleString('zh-TW') : '-'}
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>
+                                    {record.qcApproval ? (record.qcApproval.status === 'PENDING_PM' ? '待 PM 簽核' : record.qcApproval.status === 'PENDING_QC' ? '等待 QC' : '-') : '不適用'}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div>
-                        <span style={{ display: 'block', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>日期</span>
-                        <span style={{ fontWeight: 500 }}>{new Date(record.createdAt).toLocaleString()}</span>
-                    </div>
+
+                    {/* Notes Section */}
+                    {(record.reviewNote || record.qcApproval?.qcNote || record.qcApproval?.pmNote) && (
+                        <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid var(--color-border)', background: 'rgba(0,0,0,0.01)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: '0.5rem' }}>備註</div>
+                            {record.reviewNote && (
+                                <div style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                                    <strong>核准備註:</strong> {record.reviewNote}
+                                </div>
+                            )}
+                            {record.qcApproval?.qcNote && (
+                                <div style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                                    <strong>QC 備註:</strong> {record.qcApproval.qcNote}
+                                </div>
+                            )}
+                            {record.qcApproval?.pmNote && (
+                                <div style={{ fontSize: '0.85rem' }}>
+                                    <strong>PM 備註:</strong> {record.qcApproval.pmNote}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
+
 
             {/* Diff View */}
             {diff && (

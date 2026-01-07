@@ -1,6 +1,6 @@
 # 技術文件 - 專案項目資訊管理系統 (tech.md)
 
->> 最後更新: 2026-01-05
+>> 最後更新: 2026-01-07
 
 ## 專案資訊
 
@@ -832,6 +832,121 @@ src/
 - 獨立頁面列出所有品質文件
 - **UI 設計**: 統一使用 History Table 風格 (清單模式)，移除卡片視圖以保持專業感
 - **功能**: 排序 (日期、編號、版本)、下載
+
+---
+
+## Phase 8: UI/UX 優化與強化 (v1.1.0)
+
+### 8.1 首頁儀表板 Infographic 改版
+
+**色彩系統擴充** (`globals.css`):
+
+```css
+:root {
+  /* Infographic Palette */
+  --color-brand-teal: #00838F;
+  --color-brand-orange: #FF6F00;
+  --color-brand-yellow: #FBC02D;
+  --color-brand-navy: #37474F;
+  
+  /* Chart Colors */
+  --chart-1: #00BCD4;  /* Teal */
+  --chart-2: #FF9800;  /* Orange */
+  --chart-3: #FFC107;  /* Yellow */
+  --chart-4: #9C27B0;  /* Purple */
+  --chart-5: #1A237E;  /* Navy */
+}
+```
+
+**Dashboard 卡片設計**:
+
+- 三欄響應式佈局 (`minmax(320px, 1fr)`)
+- 卡片頂部色條 (`borderTop: 6px solid var(--chart-x)`)
+- 大字號數據展示 (3.5rem, fontWeight 800)
+- 進度條視覺化
+
+**資料統計 API** (`getEnhancedStats`):
+
+```typescript
+return {
+  overview: { projectCount, itemCount, fileCount },
+  recent: { newItems, newFiles, edits },  // 7 days
+  pending: { items, files, qc, total },
+  totalEdits
+};
+```
+
+### 8.2 SidebarNav 新增子項目功能
+
+**Props 擴充**:
+
+```typescript
+interface SidebarNavProps {
+  nodes: ItemNode[];
+  level?: number;
+  currentItemId?: number;
+  canEdit?: boolean;      // NEW
+  projectId?: number;     // NEW
+}
+```
+
+**使用方式** (`/items/[id]/page.tsx`):
+
+```tsx
+<SidebarNav 
+  nodes={rootNodes} 
+  currentItemId={itemId} 
+  canEdit={canEdit} 
+  projectId={item.projectId} 
+/>
+```
+
+### 8.3 HistorySidebar Accordion 效果
+
+**樹狀結構建立**:
+
+```typescript
+function buildHistoryTree(items: HistoryItem[]): TreeNode[] {
+  // 根據 fullId 解析層級結構
+  // WQ-1 -> WQ-1-1 -> WQ-1-1-1
+  const parts = item.fullId.split('-');
+  const level = parts.length - 1;
+  const parentId = parts.slice(0, -1).join('-');
+}
+```
+
+**Accordion 元件特性**:
+
+- 展開/摺疊動畫 (`maxHeight` transition)
+- 左側邊線表示層級 (`borderLeft: 2px solid`)
+- 子項目數量 Badge
+- 刪除項目標記 (strikethrough)
+
+### 8.4 歷史詳情審查紀錄
+
+**資料查詢擴充** (`getHistoryDetail`):
+
+```typescript
+include: {
+  submittedBy: { select: { username: true } },
+  reviewedBy: { select: { username: true } },
+  qcApproval: {
+    include: {
+      qcApprovedBy: { select: { username: true } },
+      pmApprovedBy: { select: { username: true } }
+    }
+  }
+}
+```
+
+**UI 呈現**:
+
+| 欄位 | 內容 |
+|------|------|
+| 提交者 | 姓名 + 提交時間 |
+| 核准者 | 姓名 + 核准時間 |
+| QC 簽核 | QC 核准者 + 簽核時間 |
+| PM 簽核 | PM 核准者 + 簽核時間 |
 
 ---
 

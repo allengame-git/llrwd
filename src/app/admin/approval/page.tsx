@@ -49,7 +49,7 @@ export default async function ApprovalPage() {
                     <h2 style={{ fontSize: "1.2rem", marginBottom: "1rem", color: "var(--color-text-secondary)" }}>
                         📋 項目變更申請 ({requests.length})
                     </h2>
-                    <ApprovalList requests={requests} currentUsername={session.user.username} />
+                    <ApprovalList requests={requests} currentUsername={session.user.username} currentUserRole={session.user.role} />
                 </div>
             )}
 

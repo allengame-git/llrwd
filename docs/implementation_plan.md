@@ -1,16 +1,16 @@
 # 功能實作計畫 (implementation_plan.md)
 
-> 最後更新: 2026-01-05
+> 最後更新: 2026-01-07
 
 本文件記錄各功能的需求分析與技術設計。
 
 ## 最新更新
 
+- **Phase 8.1**: 首頁儀表板 Infographic 改版 ✅ 已完成 (2026-01-07)
+- **Phase 8.2**: 側邊欄導覽強化 (Accordion) ✅ 已完成 (2026-01-07)
+- **Phase 8.3**: 歷史詳情審查紀錄優化 ✅ 已完成 (2026-01-07)
 - **Phase 6.5**: Docker 部署準備 ✅ 已完成 (2026-01-05)
 - **Phase 6.4**: 全域歷史 Dashboard 優化 ✅ 已完成 (2026-01-05)
-- **Phase 6.3**: 內容比較優化 ✅ 已完成 (2026-01-05)
-- **Phase 6.2**: 審核權限調整 (允許撤回) ✅ 已完成 (2026-01-05)
-- **Phase 6.1**: Approval Dashboard 中文化 ✅ 已完成 (2026-01-02)
 
 ---
 
@@ -375,5 +375,50 @@ const handleDrop = (e: React.DragEvent) => {
     if (droppedFile) setFile(droppedFile);
 };
 ```
+
+### 狀態: ✅ 已完成
+
+---
+
+## 11. Phase 8: UI/UX 優化與強化
+
+> Status: ✅ Done (v1.1.0)
+
+### 11.1 首頁儀表板 Infographic 改版
+
+**目標**:
+
+- 採用 Infographic 視覺風格
+- 新增全域色彩變數 (Teal, Orange, Yellow, Navy)
+- 三卡片佈局 (系統概覽、近期活動、待辦事項)
+
+**檔案修改**:
+
+- `src/app/globals.css`: 新增 CSS 變數
+- `src/app/page.tsx`: 重新設計 Dashboard UI
+
+### 11.2 側邊欄導覽強化
+
+**目標**:
+
+- `SidebarNav` 還原新增子項目功能
+- `HistorySidebar` 改為 Accordion 效果
+
+**檔案修改**:
+
+- `src/components/item/SidebarNav.tsx`: 新增 `canEdit`, `projectId` props
+- `src/components/history/HistorySidebar.tsx`: Accordion 樹狀結構
+- `src/app/items/[id]/page.tsx`: 傳遞 props
+
+### 11.3 歷史詳情審查紀錄優化
+
+**目標**:
+
+- 詳細顯示提交者、核准者、QC、PM 姓名與時間
+
+**檔案修改**:
+
+- `src/actions/history.ts`: `getHistoryDetail` 新增 `qcApproval` 關聯
+- `src/app/admin/history/detail/[id]/page.tsx`: 審查紀錄詳情卡片
 
 ### 狀態: ✅ 已完成

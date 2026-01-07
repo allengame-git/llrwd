@@ -10,7 +10,7 @@ export default async function ProjectsPage() {
     const session = await getServerSession(authOptions);
     const projects = await getProjects();
 
-    const canEdit = session?.user.role === "ADMIN" || session?.user.role === "EDITOR";
+    const canEdit = session?.user.role === "ADMIN" || session?.user.role === "INSPECTOR";
 
     return (
         <div className="container" style={{ paddingBottom: "4rem" }}>

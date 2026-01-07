@@ -172,10 +172,17 @@ export async function getHistoryDetail(historyId: number) {
         include: {
             submittedBy: { select: { username: true } },
             reviewedBy: { select: { username: true } },
-            item: { select: { fullId: true, title: true } }
+            item: { select: { fullId: true, title: true } },
+            qcApproval: {
+                include: {
+                    qcApprovedBy: { select: { username: true } },
+                    pmApprovedBy: { select: { username: true } }
+                }
+            }
         }
     });
 }
+
 
 /**
  * Get global history (Dashboard)

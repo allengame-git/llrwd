@@ -1,10 +1,9 @@
 "use client";
 
-import { submitDeleteProjectRequest } from "@/actions/approval";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { useState, useTransition } from "react";
 import EditProjectButton from "./EditProjectButton";
+import DeleteProjectButton from "./DeleteProjectButton";
 
 type Project = {
     id: number;
@@ -20,37 +19,8 @@ type Project = {
 
 export default function ProjectList({ projects }: { projects: Project[] }) {
     const { data: session } = useSession();
-    const [isPending, startTransition] = useTransition();
-    const [deleteStatus, setDeleteStatus] = useState<{ projectId: number; message?: string; error?: string } | null>(null);
 
-    const canEdit = session?.user.role === "ADMIN" || session?.user.role === "EDITOR" || session?.user.role === "INSPECTOR";
-
-    const handleDelete = (project: Project) => {
-        // Confirmation dialog with project name
-        const confirmed = confirm(
-            `Are you sure you want to request deletion of project "${project.title}"?\n\n` +
-            `This will submit a deletion request that requires approval.\n` +
-            `Note: Projects with existing items cannot be deleted.`
-        );
-
-        if (confirmed) {
-            startTransition(async () => {
-                const result = await submitDeleteProjectRequest(project.id);
-                if (result.error) {
-                    setDeleteStatus({ projectId: project.id, error: result.error });
-                    // Clear error after 5 seconds
-                    setTimeout(() => setDeleteStatus(null), 5000);
-                } else {
-                    setDeleteStatus({ projectId: project.id, message: result.message });
-                    // Reload after showing success
-                    setTimeout(() => {
-                        setDeleteStatus(null);
-                        window.location.reload();
-                    }, 2000);
-                }
-            });
-        }
-    };
+    const canEdit = session?.user.role === "ADMIN" || session?.user.role === "INSPECTOR";
 
     if (projects.length === 0) {
         return (
@@ -80,51 +50,10 @@ export default function ProjectList({ projects }: { projects: Project[] }) {
                                 <EditProjectButton project={project} />
                             )}
                             {session?.user.role === "ADMIN" && (
-                                <button
-                                    onClick={() => handleDelete(project)}
-                                    disabled={isPending}
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        color: "var(--color-danger)",
-                                        cursor: isPending ? "not-allowed" : "pointer",
-                                        fontSize: "0.9rem",
-                                        padding: "0.25rem 0.5rem",
-                                        opacity: isPending ? 0.5 : 1
-                                    }}
-                                    title="Request Delete Project"
-                                >
-                                    Delete
-                                </button>
+                                <DeleteProjectButton project={project} />
                             )}
                         </div>
                     </div>
-
-                    {/* Status Messages */}
-                    {deleteStatus?.projectId === project.id && deleteStatus.error && (
-                        <div style={{
-                            padding: "0.5rem 0.75rem",
-                            backgroundColor: "rgba(239, 68, 68, 0.1)",
-                            border: "1px solid var(--color-danger)",
-                            borderRadius: "var(--radius-sm)",
-                            color: "var(--color-danger)",
-                            fontSize: "0.85rem"
-                        }}>
-                            {deleteStatus.error}
-                        </div>
-                    )}
-                    {deleteStatus?.projectId === project.id && deleteStatus.message && (
-                        <div style={{
-                            padding: "0.5rem 0.75rem",
-                            backgroundColor: "rgba(16, 185, 129, 0.1)",
-                            border: "1px solid var(--color-success)",
-                            borderRadius: "var(--radius-sm)",
-                            color: "var(--color-success)",
-                            fontSize: "0.85rem"
-                        }}>
-                            {deleteStatus.message}
-                        </div>
-                    )}
 
                     <p style={{ color: "var(--color-text-muted)", fontSize: "0.95rem", flex: 1 }}>
                         {project.description || "No description"}
