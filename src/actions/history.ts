@@ -47,7 +47,7 @@ function computeDiff(oldData: ItemSnapshot, newData: ItemSnapshot) {
 export async function createHistoryRecord(
     item: Item,
     snapshotData: ItemSnapshot,
-    changeRequest: { id: number; submittedById: string | null; submitReason?: string | null; reviewNote?: string | null },
+    changeRequest: { id: number; submittedById: string | null; submitReason?: string | null; reviewNote?: string | null; createdAt: Date },
     changeType: "CREATE" | "UPDATE" | "DELETE" | "RESTORE",
     reviewerId: string,
     oldSnapshot?: ItemSnapshot
@@ -95,7 +95,7 @@ export async function createHistoryRecord(
             include: {
                 submittedBy: { select: { username: true } },
                 reviewedBy: { select: { username: true } },
-                project: { select: { title: true } }
+                project: { select: { title: true, codePrefix: true } }
             }
         });
         console.log('[createHistoryRecord] fullHistory fetched:', fullHistory ? 'OK' : 'NULL');
@@ -103,7 +103,10 @@ export async function createHistoryRecord(
         if (fullHistory) {
             console.log('[createHistoryRecord] Calling generateQCDocument...');
             // @ts-ignore - Types compatibility
-            const pdfPath = await generateQCDocument(fullHistory, item);
+            const pdfPath = await generateQCDocument({
+                ...fullHistory,
+                submissionDate: changeRequest.createdAt
+            }, item);
             console.log('[createHistoryRecord] PDF generated at:', pdfPath);
 
             // Save path to history record

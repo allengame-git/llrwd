@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { embedSignatureInPDF } from "@/lib/pdf-signature";
+import { generateQCDocument } from "@/lib/pdf-generator";
 
 // ============================================
 // QC Document Approval Actions
@@ -118,7 +118,7 @@ export async function getQCDocumentApprovals() {
 }
 
 /**
- * Approve as QC - Embed QC signature and advance to PM stage
+ * Approve as QC - Embed QC signature (by regenerating PDF) and advance to PM stage
  */
 export async function approveAsQC(
     approvalId: number,
@@ -130,7 +130,7 @@ export async function approveAsQC(
     // Verify QC qualification
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { isQC: true, signaturePath: true, username: true }
+        select: { isQC: true, username: true }
     });
 
     if (!user?.isQC) return { error: "Unauthorized - QC qualification required" };
@@ -146,19 +146,47 @@ export async function approveAsQC(
     if (!approval) return { error: "Approval record not found" };
     if (approval.status !== "PENDING_QC") return { error: "Document is not pending QC approval" };
 
-    // Embed signature if available
-    if (user.signaturePath && approval.itemHistory.isoDocPath) {
-        try {
-            await embedSignatureInPDF(
-                approval.itemHistory.isoDocPath,
-                user.signaturePath,
-                "qc",
-                user.username
-            );
-        } catch (err) {
-            console.error("Failed to embed QC signature:", err);
-            // Continue even if signature embedding fails
+    // Link ChangeRequest to get submission date
+    let submissionDate: Date | undefined;
+    if (approval.itemHistory.changeRequestId) {
+        const req = await prisma.changeRequest.findUnique({ where: { id: approval.itemHistory.changeRequestId } });
+        if (req?.createdAt) {
+            submissionDate = req.createdAt;
         }
+    }
+
+    // Regenerate PDF to include QC data
+    try {
+        const fullHistory = await prisma.itemHistory.findUnique({
+            where: { id: approval.itemHistoryId },
+            include: {
+                project: true,
+                submittedBy: { select: { username: true } },
+                reviewedBy: { select: { username: true } }
+            }
+        });
+
+        if (fullHistory) {
+            const pdfPath = await generateQCDocument({
+                // @ts-ignore - Prisma types vs Local Interface
+                ...fullHistory,
+                submissionDate: submissionDate,
+                qcNote: note || "同意",
+                qcDate: new Date(),
+                qcUser: user.username, // Passed from session user
+                pmNote: null,
+                pmDate: null,
+                pmUser: null
+            }, null);
+
+            // Update history with new path
+            await prisma.itemHistory.update({
+                where: { id: approval.itemHistoryId },
+                data: { isoDocPath: pdfPath }
+            });
+        }
+    } catch (err) {
+        console.error("Failed to regenerate PDF during QC approval:", err);
     }
 
     // Update approval status
@@ -168,7 +196,7 @@ export async function approveAsQC(
             status: "PENDING_PM",
             qcApprovedById: session.user.id,
             qcApprovedAt: new Date(),
-            qcNote: note || null,
+            qcNote: note || "同意",
         }
     });
 
@@ -178,7 +206,7 @@ export async function approveAsQC(
 }
 
 /**
- * Approve as PM - Embed PM signature and complete the workflow
+ * Approve as PM - Embed PM signature (by regenerating PDF) and complete the workflow
  */
 export async function approveAsPM(
     approvalId: number,
@@ -190,7 +218,7 @@ export async function approveAsPM(
     // Verify PM qualification
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { isPM: true, signaturePath: true, username: true }
+        select: { isPM: true, username: true }
     });
 
     if (!user?.isPM) return { error: "Unauthorized - PM qualification required" };
@@ -199,26 +227,54 @@ export async function approveAsPM(
     const approval = await prisma.qCDocumentApproval.findUnique({
         where: { id: approvalId },
         include: {
-            itemHistory: true
+            itemHistory: true,
+            qcApprovedBy: { select: { username: true } } // Fetch QC approver name
         }
     });
 
     if (!approval) return { error: "Approval record not found" };
     if (approval.status !== "PENDING_PM") return { error: "Document is not pending PM approval" };
 
-    // Embed signature if available
-    if (user.signaturePath && approval.itemHistory.isoDocPath) {
-        try {
-            await embedSignatureInPDF(
-                approval.itemHistory.isoDocPath,
-                user.signaturePath,
-                "pm",
-                user.username
-            );
-        } catch (err) {
-            console.error("Failed to embed PM signature:", err);
-            // Continue even if signature embedding fails
+    // Link ChangeRequest to get submission date
+    let submissionDate: Date | undefined;
+    if (approval.itemHistory.changeRequestId) {
+        const req = await prisma.changeRequest.findUnique({ where: { id: approval.itemHistory.changeRequestId } });
+        if (req?.createdAt) {
+            submissionDate = req.createdAt;
         }
+    }
+
+    // Regenerate PDF to include PM data (and keep QC data)
+    try {
+        const fullHistory = await prisma.itemHistory.findUnique({
+            where: { id: approval.itemHistoryId },
+            include: {
+                project: true,
+                submittedBy: { select: { username: true } },
+                reviewedBy: { select: { username: true } }
+            }
+        });
+
+        if (fullHistory) {
+            const pdfPath = await generateQCDocument({
+                // @ts-ignore
+                ...fullHistory,
+                submissionDate: submissionDate,
+                qcNote: approval.qcNote,
+                qcDate: approval.qcApprovedAt,
+                qcUser: approval.qcApprovedBy?.username, // Existing QC approver
+                pmNote: note || "同意",
+                pmDate: new Date(),
+                pmUser: user.username // Current PM approver
+            }, null);
+
+            await prisma.itemHistory.update({
+                where: { id: approval.itemHistoryId },
+                data: { isoDocPath: pdfPath }
+            });
+        }
+    } catch (err) {
+        console.error("Failed to regenerate PDF during PM approval:", err);
     }
 
     // Update approval status
@@ -228,7 +284,7 @@ export async function approveAsPM(
             status: "COMPLETED",
             pmApprovedById: session.user.id,
             pmApprovedAt: new Date(),
-            pmNote: note || null,
+            pmNote: note || "同意",
         }
     });
 

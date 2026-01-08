@@ -4,7 +4,8 @@ const nextConfig = {
     experimental: {
         serverActions: {
             bodySizeLimit: '100mb'
-        }
+        },
+        serverComponentsExternalPackages: ['puppeteer', 'puppeteer-core', '@pdf-lib/fontkit', 'pdf-lib']
     }
 };
 

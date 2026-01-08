@@ -453,4 +453,34 @@ const handleDrop = (e: React.DragEvent) => {
 1. 以 Admin 登入
 2. 點擊自己的 Edit 按鈕 (應可點擊)
 3. 修改密碼 -> 登出 -> 使用新密碼登入 (應成功)
-4. 嘗試修改自己的 Role (應無法修改)
+4. 修改密碼 -> 登出 -> 使用新密碼登入 (應成功)
+5. 嘗試修改自己的 Role (應無法修改)
+
+---
+
+## 13. Phase 13: 品質文件 PDF 優化
+
+> Status: ⏳ In Progress
+
+### 13.1 需求分析
+
+- **PDF 結構優化**: 移除舊版文字預覽，改為標準化表單 (含詳細簽核資訊)
+- **檔案管理**: 強制單一檔案策略 (`QC-[Project]-[ID].pdf`)
+- **內容附件**: PM 核准後，自動截圖變更內容 (HTML Snapshot) 並附加於文件末尾
+
+### 13.2 技術實作
+
+**Screenshot Generation**:
+
+- Library: `puppeteer` (Headless Chrome)
+- Flow:
+  1. `generateQCDocument` 收到的 `history` 包含 `snapshot`
+  2. 解析 `snapshot.content` (HTML)
+  3. 使用 Puppeteer `page.setContent(html)` 渲染
+  4. `page.screenshot({ type: 'png' })`
+  5. `pdf-lib` 嵌入圖片至新頁面
+
+**注意事項**:
+
+- 中文字型需確保 Puppeteer 環境可讀取
+- 樣式需注入 (Tailwind or Basic CSS) 以確保可讀性

@@ -348,7 +348,7 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
                 relatedItems: relationsForSnapshot.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
             };
 
-            await createHistoryRecord(newItem, snapshot, { id: request.id, submittedById: request.submittedById, submitReason: request.submitReason, reviewNote: reviewNote }, "CREATE", session.user.id);
+            await createHistoryRecord(newItem, snapshot, { id: request.id, submittedById: request.submittedById, submitReason: request.submitReason, reviewNote: reviewNote, createdAt: request.createdAt }, "CREATE", session.user.id);
         }
         else if (request.type === "UPDATE") {
             if (!request.itemId) throw new Error("Missing target item ID");
@@ -423,7 +423,7 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
                     relatedItems: updatedRelations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
                 };
 
-                await createHistoryRecord(updatedItem, newSnapshot, { id: request.id, submittedById: request.submittedById, submitReason: request.submitReason, reviewNote: reviewNote }, "UPDATE", session.user.id, oldSnapshot);
+                await createHistoryRecord(updatedItem, newSnapshot, { id: request.id, submittedById: request.submittedById, submitReason: request.submitReason, reviewNote: reviewNote, createdAt: request.createdAt }, "UPDATE", session.user.id, oldSnapshot);
             }
         }
         else if (request.type === "DELETE") {
@@ -466,7 +466,7 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
                 data: { isDeleted: true }
             });
 
-            await createHistoryRecord(item, lastSnapshot, { id: request.id, submittedById: request.submittedById, submitReason: request.submitReason, reviewNote: reviewNote }, "DELETE", session.user.id);
+            await createHistoryRecord(item, lastSnapshot, { id: request.id, submittedById: request.submittedById, submitReason: request.submitReason, reviewNote: reviewNote, createdAt: request.createdAt }, "DELETE", session.user.id);
         }
         else if (request.type === "PROJECT_UPDATE") {
             if (!request.targetProjectId) throw new Error("Missing target project ID");
@@ -498,7 +498,7 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
             data: {
                 status: "APPROVED",
                 reviewedById: session.user.id,
-                reviewNote: reviewNote || null,
+                reviewNote: reviewNote || "同意",
                 updatedAt: new Date()
             }
         });
