@@ -49,9 +49,9 @@ export async function submitCreateItemRequest(
                 type: "CREATE",
                 status: "PENDING",
                 data,
-                targetProjectId: projectId,
-                targetParentId: parentId,
-                submittedById: session.user.id,
+                targetProject: { connect: { id: projectId } },
+                targetParent: parentId ? { connect: { id: parentId } } : undefined,
+                submittedBy: { connect: { id: session.user.id } },
                 submitReason,
             },
         });
@@ -101,11 +101,12 @@ export async function submitUpdateItemRequest(
                 type: "UPDATE",
                 status: "PENDING",
                 data,
-                itemId: itemId,
-                targetProjectId: item.projectId,
-                submittedById: session.user.id,
+                item: { connect: { id: itemId } },
+                targetProject: { connect: { id: item.projectId } },
+                submittedBy: { connect: { id: session.user.id } },
                 submitReason,
-                previousRequestId: (previousRequestId && !isNaN(previousRequestId)) ? previousRequestId : null,
+                // Use previousRequestId if relation name is causing issues, but connect is preferred
+                ...(previousRequestId ? { previousRequest: { connect: { id: previousRequestId } } } : {}),
             },
         });
 
@@ -142,9 +143,9 @@ export async function submitDeleteItemRequest(itemId: number, submitReason?: str
                 type: "DELETE",
                 status: "PENDING",
                 data: "{}",
-                itemId: itemId,
-                targetProjectId: item.projectId,
-                submittedById: session.user.id,
+                item: { connect: { id: itemId } },
+                targetProject: { connect: { id: item.projectId } },
+                submittedBy: { connect: { id: session.user.id } },
                 submitReason: submitReason || null,
             },
         });

@@ -39,6 +39,7 @@ interface ItemHistory {
         requestNote: string;
         resolvedAt?: Date | null;
     }>;
+    reviewChain?: any[]; // For generic change requests
 }
 
 interface Item {
@@ -100,24 +101,119 @@ const generateHistoryPagePDF = async (history: ItemHistory): Promise<Uint8Array 
             return html;
         };
 
-        // Helper to render Revision History Section
-        const renderRevisionHistory = () => {
-            if (!history.revisions || history.revisions.length === 0) return '';
-            let html = '<div class="section"><h2>修訂歷程</h2>';
-            html += '<table class="revision-table">';
-            html += '<thead><tr><th>版次</th><th>退回者</th><th>修改要求</th><th>完成時間</th></tr></thead>';
-            html += '<tbody>';
-            for (const rev of history.revisions) {
-                html += `
-                    <tr>
-                        <td style="text-align: center; font-weight: bold;">#${rev.revisionNumber}</td>
-                        <td>${rev.requestedBy?.username || '-'}</td>
-                        <td>${rev.requestNote}</td>
-                        <td style="text-align: center;">${rev.resolvedAt ? new Date(rev.resolvedAt).toLocaleString('zh-TW') : '<span style="color: #d97706;">待修訂</span>'}</td>
-                    </tr>
-                `;
+        // Helper to render Review Timeline (Round-based)
+        const renderReviewTimeline = () => {
+            const rounds: any[][] = [];
+
+            // 1. Process reviewChain (Generic requests)
+            if (history.reviewChain && history.reviewChain.length > 0) {
+                const sortedChain = [...history.reviewChain].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                for (const req of sortedChain) {
+                    const roundEvents: any[] = [];
+                    roundEvents.push({
+                        type: req.previousRequestId ? "重新提交" : "提交",
+                        user: req.submittedBy?.username || req.submitterName || "提交者",
+                        date: new Date(req.createdAt),
+                        note: req.submitReason,
+                        status: "info"
+                    });
+                    if (req.status === "APPROVED" && req.reviewedBy) {
+                        roundEvents.push({
+                            type: "核准",
+                            user: req.reviewedBy.username,
+                            date: new Date(req.updatedAt),
+                            note: req.reviewNote,
+                            status: "success"
+                        });
+                    } else if ((req.status === "REJECTED" || req.status === "RESUBMITTED") && req.reviewedBy) {
+                        roundEvents.push({
+                            type: "退回修改",
+                            user: req.reviewedBy.username,
+                            date: new Date(req.updatedAt),
+                            note: req.reviewNote,
+                            status: "danger"
+                        });
+                    }
+                    rounds.push(roundEvents);
+                }
+            } else {
+                // Fallback for direct ISO flow without previous chain records
+                rounds.push([{
+                    type: "提交",
+                    user: history.submittedBy?.username || "提交者",
+                    date: new Date(history.submissionDate || history.createdAt),
+                    note: history.submitReason,
+                    status: "info"
+                }]);
+                if (history.reviewedBy) {
+                    rounds[0].push({
+                        type: "核准",
+                        user: history.reviewedBy.username,
+                        date: new Date(history.createdAt),
+                        note: history.reviewNote,
+                        status: "success"
+                    });
+                }
             }
-            html += '</tbody></table></div>';
+
+            // Append QC/PM to last round
+            const lastRound = rounds[rounds.length - 1] || [];
+            if (history.qcUser && history.qcDate) {
+                lastRound.push({ type: "QC 簽核", user: history.qcUser, date: new Date(history.qcDate), note: history.qcNote, status: "success" });
+            }
+            if (history.pmUser && history.pmDate) {
+                lastRound.push({ type: "PM 簽核", user: history.pmUser, date: new Date(history.pmDate), note: history.pmNote, status: "success" });
+            }
+
+            // 2. Process Revisions (ISO flow)
+            if (history.revisions && history.revisions.length > 0) {
+                for (const rev of history.revisions) {
+                    const revRound: any[] = [];
+                    revRound.push({
+                        type: "退回修改",
+                        user: rev.requestedBy?.username || "審核者",
+                        date: new Date(rev.requestedAt),
+                        note: rev.requestNote,
+                        status: "warning"
+                    });
+                    if (rev.resolvedAt) {
+                        revRound.push({
+                            type: "重新提交",
+                            user: history.submittedBy?.username || "提交者",
+                            date: new Date(rev.resolvedAt),
+                            note: `完成第 ${rev.revisionNumber} 次修訂`,
+                            status: "info"
+                        });
+                    }
+                    rounds.push(revRound);
+                }
+            }
+
+            if (rounds.length === 0) return '';
+
+            let html = '<div class="section"><h2>審核歷程時間軸</h2><div class="timeline-container">';
+            rounds.forEach((round, idx) => {
+                html += `<div class="timeline-round">`;
+                html += `<div class="round-title">ROUND ${idx + 1}</div>`;
+                round.forEach(ev => {
+                    const color = ev.status === 'success' ? '#10b981' : ev.status === 'warning' ? '#f59e0b' : ev.status === 'danger' ? '#ef4444' : '#3b82f6';
+                    html += `
+                        <div class="timeline-event">
+                            <div class="event-dot" style="background: ${color}"></div>
+                            <div class="event-content">
+                                <div class="event-header">
+                                    <span class="event-type" style="color: ${color}; border-color: ${color}40; background: ${color}15">${ev.type}</span>
+                                    <span class="event-user">${ev.user}</span>
+                                </div>
+                                <div class="event-date">${new Date(ev.date).toLocaleString('zh-TW')}</div>
+                                ${ev.note ? `<div class="event-note">${ev.note}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            });
+            html += '</div></div>';
             return html;
         };
 
@@ -182,6 +278,18 @@ const generateHistoryPagePDF = async (history: ItemHistory): Promise<Uint8Array 
                     .revision-table { font-size: 12px; }
                     .revision-table th { background: #f5f5f5; font-weight: 600; }
                     .revision-table td { vertical-align: top; }
+
+                    /* Timeline Styles */
+                    .timeline-container { display: block; }
+                    .timeline-round { border: 1px dashed #ddd; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #fff; }
+                    .round-title { font-size: 12px; font-weight: bold; color: #666; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                    .timeline-event { position: relative; padding-left: 20px; border-left: 2px solid #eee; margin-bottom: 15px; }
+                    .event-dot { position: absolute; left: -6px; top: 4px; width: 10px; height: 10px; borderRadius: 50%; border: 2px solid #fff; }
+                    .event-header { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+                    .event-type { font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 600; border: 1px solid; }
+                    .event-user { font-weight: bold; font-size: 13px; }
+                    .event-date { font-size: 11px; color: #888; margin-bottom: 3px; }
+                    .event-note { font-size: 12px; background: #f9f9f9; padding: 6px 10px; border-radius: 4px; border: 1px solid #eee; }
                 </style>
             </head>
             <body>
@@ -219,7 +327,7 @@ const generateHistoryPagePDF = async (history: ItemHistory): Promise<Uint8Array 
                     </div>` : ''}
                 </div>
 
-                ${renderRevisionHistory()}
+                ${renderReviewTimeline()}
 
                 ${renderDiffSection()}
                 

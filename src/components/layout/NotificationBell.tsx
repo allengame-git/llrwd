@@ -8,6 +8,7 @@ import {
     markAsRead,
     markAllAsRead
 } from "@/actions/notifications";
+import { formatDate } from "@/lib/date-utils";
 
 interface Notification {
     id: string;
@@ -103,7 +104,7 @@ export default function NotificationBell() {
         if (minutes < 60) return `${minutes} 分鐘前`;
         if (hours < 24) return `${hours} 小時前`;
         if (days < 7) return `${days} 天前`;
-        return new Date(date).toLocaleDateString("zh-TW");
+        return formatDate(date);
     };
 
     // 取得通知圖示

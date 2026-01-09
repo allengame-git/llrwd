@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { approveDataFileRequest, rejectDataFileRequest } from '@/actions/data-files';
+import { formatDate, formatDateTime } from '@/lib/date-utils';
 
 type DataFile = {
     id: number;
@@ -275,10 +276,7 @@ export default function DataFileApprovalList({
                             }}>
                                 <span>編輯者：{submitterUsername}</span>
                                 <span>
-                                    {new Date(req.createdAt).toLocaleDateString('zh-TW', {
-                                        month: 'short',
-                                        day: 'numeric'
-                                    })}
+                                    {formatDate(req.createdAt)}
                                 </span>
                             </div>
 
@@ -327,7 +325,7 @@ export default function DataFileApprovalList({
                                     {typeInfo.label} 申請詳情
                                 </h2>
                                 <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
-                                    {new Date(req.createdAt).toLocaleString('zh-TW')}
+                                    {formatDateTime(req.createdAt)}
                                 </div>
                             </div>
                             <button

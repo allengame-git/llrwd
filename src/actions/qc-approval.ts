@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { generateQCDocument } from "@/lib/pdf-generator";
 import { createNotification } from "./notifications";
+import { getRequestChain } from "./history";
 
 // ============================================
 // QC Document Approval Actions
@@ -168,6 +169,11 @@ export async function approveAsQC(
         });
 
         if (fullHistory) {
+            let reviewChain: any[] = [];
+            if (approval.itemHistory.changeRequestId) {
+                reviewChain = await getRequestChain(approval.itemHistory.changeRequestId);
+            }
+
             const pdfPath = await generateQCDocument({
                 // @ts-ignore - Prisma types vs Local Interface
                 ...fullHistory,
@@ -177,7 +183,8 @@ export async function approveAsQC(
                 qcUser: user.username, // Passed from session user
                 pmNote: null,
                 pmDate: null,
-                pmUser: null
+                pmUser: null,
+                reviewChain
             }, null);
 
             // Update history with new path
@@ -257,6 +264,11 @@ export async function approveAsPM(
         });
 
         if (fullHistory) {
+            let reviewChain: any[] = [];
+            if (approval.itemHistory.changeRequestId) {
+                reviewChain = await getRequestChain(approval.itemHistory.changeRequestId);
+            }
+
             const pdfPath = await generateQCDocument({
                 // @ts-ignore
                 ...fullHistory,
@@ -266,7 +278,8 @@ export async function approveAsPM(
                 qcUser: approval.qcApprovedBy?.username, // Existing QC approver
                 pmNote: note || "同意",
                 pmDate: new Date(),
-                pmUser: user.username // Current PM approver
+                pmUser: user.username, // Current PM approver
+                reviewChain
             }, null);
 
             await prisma.itemHistory.update({
@@ -308,7 +321,7 @@ export async function approveAsPM(
 }
 
 /**
- * Reject QC Document - Changes to REVISION_REQUIRED and creates revision record
+ * Reject QC Document - Changes status to REJECTED and marks the original ChangeRequest as REJECTED
  */
 export async function rejectQCDocument(
     approvalId: number,
@@ -327,7 +340,7 @@ export async function rejectQCDocument(
         return { error: "Unauthorized - QC or PM qualification required" };
     }
 
-    // Get the approval record with itemHistory
+    // Get the approval record with itemHistory and the associated change request
     const approval = await prisma.qCDocumentApproval.findUnique({
         where: { id: approvalId },
         include: {
@@ -337,6 +350,7 @@ export async function rejectQCDocument(
                     itemFullId: true,
                     itemTitle: true,
                     submittedById: true,
+                    changeRequestId: true,
                 }
             }
         }
@@ -352,25 +366,9 @@ export async function rejectQCDocument(
         return { error: "Only PM users can reject at PM stage" };
     }
 
-    // Calculate next revision number
-    const existingRevisions = await prisma.qCDocumentRevision.count({
-        where: { approvalId }
-    });
-    const nextRevisionNumber = existingRevisions + 1;
-
-    // Create revision record
-    await prisma.qCDocumentRevision.create({
-        data: {
-            approvalId,
-            revisionNumber: nextRevisionNumber,
-            requestedById: session.user.id,
-            requestNote: note,
-        }
-    });
-
-    // Update approval status to REVISION_REQUIRED
-    const updateData: Record<string, unknown> = {
-        status: "REVISION_REQUIRED",
+    // Update approval status to REJECTED
+    const updateData: any = {
+        status: "REJECTED",
     };
 
     if (approval.status === "PENDING_QC") {
@@ -388,132 +386,37 @@ export async function rejectQCDocument(
         data: updateData
     });
 
-    // Send notification to editor
-    if (approval.itemHistory.submittedById) {
+    // CRITICAL: Also mark the original ChangeRequest as REJECTED so it appears in /admin/rejected-requests
+    if (approval.itemHistory.changeRequestId) {
+        await prisma.changeRequest.update({
+            where: { id: approval.itemHistory.changeRequestId },
+            data: {
+                status: "REJECTED",
+                reviewedById: session.user.id,
+                reviewNote: note,
+            }
+        });
+    }
+
+    // Send notification to editor - Now linking back to standard rejected-requests
+    if (approval.itemHistory.submittedById && approval.itemHistory.changeRequestId) {
         await createNotification({
             userId: approval.itemHistory.submittedById,
-            type: "REVISION_REQUEST",
-            title: `品質文件需要修改`,
+            type: "REJECTION",
+            title: `品質文件已被退回 (${user.isPM ? 'PM' : 'QC'})`,
             message: `${approval.itemHistory.itemFullId} ${approval.itemHistory.itemTitle} - ${note}`,
-            link: `/admin/revisions`,
+            link: `/admin/rejected-requests/${approval.itemHistory.changeRequestId}`,
             qcApprovalId: approvalId,
             itemHistoryId: approval.itemHistory.id,
         });
     }
 
     revalidatePath("/admin/approvals");
-    revalidatePath("/admin/revisions");
+    revalidatePath("/admin/rejected-requests");
     revalidatePath("/iso-docs");
     return { message: "已退回要求修改" };
 }
 
-/**
- * Get documents requiring revision for current user
- */
-export async function getRevisionRequiredDocuments(userId?: string) {
-    const session = await getServerSession(authOptions);
-    if (!session) return [];
-
-    const targetUserId = userId || session.user.id;
-
-    const approvals = await prisma.qCDocumentApproval.findMany({
-        where: {
-            status: "REVISION_REQUIRED",
-            itemHistory: {
-                submittedById: targetUserId
-            }
-        },
-        include: {
-            itemHistory: {
-                select: {
-                    id: true,
-                    itemId: true,
-                    itemFullId: true,
-                    itemTitle: true,
-                    version: true,
-                    changeType: true,
-                    createdAt: true,
-                }
-            },
-            revisions: {
-                orderBy: { revisionNumber: "desc" },
-                take: 1,
-                include: {
-                    requestedBy: { select: { username: true } }
-                }
-            }
-        },
-        orderBy: { updatedAt: "desc" }
-    });
-
-    return approvals;
-}
-
-/**
- * Resubmit a revised document for review
- * Called after editor makes changes and creates new ItemHistory
- */
-export async function resubmitForReview(
-    approvalId: number,
-    newItemHistoryId: number
-): Promise<QCApprovalState> {
-    const session = await getServerSession(authOptions);
-    if (!session) return { error: "Unauthorized" };
-
-    // Get the approval record
-    const approval = await prisma.qCDocumentApproval.findUnique({
-        where: { id: approvalId },
-        include: {
-            revisions: {
-                where: { resolvedAt: null },
-                orderBy: { revisionNumber: "desc" },
-                take: 1
-            }
-        }
-    });
-
-    if (!approval) return { error: "Approval record not found" };
-    if (approval.status !== "REVISION_REQUIRED") {
-        return { error: "Document is not in revision required state" };
-    }
-
-    // Get the latest unresolved revision
-    const latestRevision = approval.revisions[0];
-    if (!latestRevision) {
-        return { error: "No pending revision found" };
-    }
-
-    // Update revision record to mark as resolved
-    await prisma.qCDocumentRevision.update({
-        where: { id: latestRevision.id },
-        data: {
-            resolvedAt: new Date(),
-            resolvedItemHistoryId: newItemHistoryId
-        }
-    });
-
-    // Update approval: increment revision count, reset to PENDING_QC
-    await prisma.qCDocumentApproval.update({
-        where: { id: approvalId },
-        data: {
-            status: "PENDING_QC",
-            revisionCount: { increment: 1 },
-            // Clear previous approval data for re-review
-            qcApprovedById: null,
-            qcApprovedAt: null,
-            qcNote: null,
-            pmApprovedById: null,
-            pmApprovedAt: null,
-            pmNote: null,
-        }
-    });
-
-    revalidatePath("/admin/approvals");
-    revalidatePath("/admin/revisions");
-    revalidatePath("/iso-docs");
-
-    return { message: "已重新提交審核" };
-}
 
 /**
  * Create a QC Document Approval record for a new ItemHistory

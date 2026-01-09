@@ -102,10 +102,18 @@ export async function createHistoryRecord(
 
         if (fullHistory) {
             console.log('[createHistoryRecord] Calling generateQCDocument...');
+
+            // Get review chain
+            let reviewChain: any[] = [];
+            if (changeRequest.id) {
+                reviewChain = await getRequestChain(changeRequest.id);
+            }
+
             // @ts-ignore - Types compatibility
             const pdfPath = await generateQCDocument({
                 ...fullHistory,
-                submissionDate: changeRequest.createdAt
+                submissionDate: changeRequest.createdAt,
+                reviewChain
             }, item);
             console.log('[createHistoryRecord] PDF generated at:', pdfPath);
 
@@ -171,12 +179,12 @@ export async function getItemHistory(itemId: number) {
 /**
  * Get the chain of previous change requests for a given request ID
  */
-async function getRequestChain(requestId: number) {
+export async function getRequestChain(requestId: number) {
     const chain: any[] = [];
     let currentId: number | null = requestId;
 
     while (currentId) {
-        const req = await prisma.changeRequest.findUnique({
+        const req: any = await prisma.changeRequest.findUnique({
             where: { id: currentId },
             include: {
                 submittedBy: { select: { username: true } },
@@ -219,8 +227,9 @@ export async function getHistoryDetail(historyId: number) {
 
     if (!history) return null;
 
-    // If it's a generic item change (not necessarily ISO flow), 
-    // it might have a chain of previous change requests.
+    // Fetch the FULL chain of ChangeRequests for this ItemHistory
+    // The entire review cycle (submit -> reject -> resubmit -> approve) 
+    // should be displayed as one unified flow
     let reviewChain: any[] = [];
     if (history.changeRequestId) {
         reviewChain = await getRequestChain(history.changeRequestId);

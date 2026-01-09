@@ -1,4 +1,4 @@
-import { getRejectedRequests } from "@/actions/rejected-requests";
+import { getRejectedRequests } from "@/data/rejected-requests";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";

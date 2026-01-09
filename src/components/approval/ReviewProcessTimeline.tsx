@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDateTime } from "@/lib/date-utils";
+
 interface RevisionItem {
     revisionNumber: number;
     requestedBy?: { username: string } | null;
@@ -9,7 +11,7 @@ interface RevisionItem {
 }
 
 interface TimelineEvent {
-    type: "SUBMISSION" | "APPROVAL" | "REJECTION" | "QC_APPROVAL" | "PM_APPROVAL" | "REVISION_REQUEST" | "RESUBMISSION";
+    type: "SUBMISSION" | "APPROVAL" | "REJECTION" | "QC_APPROVAL" | "QC_REJECTION" | "PM_APPROVAL" | "REVISION_REQUEST" | "RESUBMISSION";
     user: string;
     date: Date;
     note?: string | null;
@@ -51,28 +53,21 @@ export default function ReviewProcessTimeline({
     currentStatus,
     reviewChain = []
 }: Props) {
-    const formatDate = (date: Date) => {
-        const d = new Date(date);
-        const Y = d.getFullYear();
-        const M = String(d.getMonth() + 1).padStart(2, "0");
-        const D = String(d.getDate()).padStart(2, "0");
-        const H = String(d.getHours()).padStart(2, "0");
-        const m = String(d.getMinutes()).padStart(2, "0");
-        return `${Y}/${M}/${D} ${H}:${m}`;
-    };
 
     // Build rounds
     const rounds: TimelineEvent[][] = [];
 
     // 1. Process reviewChain if provided (for generic change requests)
+    // Each review cycle (submit -> result) gets its own column, labeled 第一次審核, 第二次審核, etc.
     if (reviewChain && reviewChain.length > 0) {
         // chain is [newest, ..., oldest] due to recursive fetch. Reverse to oldest -> newest.
         const sortedChain = [...reviewChain].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
+        // Create separate rounds for each ChangeRequest in the chain
         for (const req of sortedChain) {
             const roundEvents: TimelineEvent[] = [];
 
-            // Submission
+            // Submission or Resubmission
             roundEvents.push({
                 type: req.previousRequestId ? "RESUBMISSION" : "SUBMISSION",
                 user: req.submittedBy?.username || req.submitterName || "提交者",
@@ -126,8 +121,28 @@ export default function ReviewProcessTimeline({
 
     // Append QC/PM approvals to the LAST round (where they belong in the flow)
     const lastRound = rounds[rounds.length - 1] || [];
+
+    // Handle QC: either approval or rejection
     if (qcApprovedBy && qcApprovedAt) {
-        lastRound.push({ type: "QC_APPROVAL", user: qcApprovedBy, date: new Date(qcApprovedAt), note: qcNote, status: "success" });
+        // Check if QC rejected (currentStatus is REJECTED and no PM approval yet)
+        const isQCRejection = currentStatus === "REJECTED" && !pmApprovedBy;
+        if (isQCRejection) {
+            lastRound.push({
+                type: "QC_REJECTION",
+                user: qcApprovedBy,
+                date: new Date(qcApprovedAt),
+                note: qcNote,
+                status: "danger"
+            });
+        } else {
+            lastRound.push({
+                type: "QC_APPROVAL",
+                user: qcApprovedBy,
+                date: new Date(qcApprovedAt),
+                note: qcNote,
+                status: "success"
+            });
+        }
     }
     if (pmApprovedBy && pmApprovedAt) {
         lastRound.push({ type: "PM_APPROVAL", user: pmApprovedBy, date: new Date(pmApprovedAt), note: pmNote, status: "success" });
@@ -165,6 +180,7 @@ export default function ReviewProcessTimeline({
             case "APPROVAL": return "核准";
             case "REJECTION": return "退回修改";
             case "QC_APPROVAL": return "QC 簽核";
+            case "QC_REJECTION": return "QC 退回";
             case "PM_APPROVAL": return "PM 簽核";
             case "REVISION_REQUEST": return "退回修改";
             case "RESUBMISSION": return "重新提交";
@@ -224,7 +240,7 @@ export default function ReviewProcessTimeline({
                                 <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: "var(--color-border)", display: "flex", justifyContent: "center", alignItems: "center", color: "var(--color-text-main)", fontSize: "10px" }}>
                                     {roundIndex + 1}
                                 </span>
-                                第 {roundIndex + 1} 輪審核
+                                第{roundIndex + 1}次審核
                             </div>
 
                             <div style={{ position: "relative", paddingLeft: "1.5rem" }}>
@@ -272,8 +288,8 @@ export default function ReviewProcessTimeline({
                                                 </span>
                                                 <span style={{ fontWeight: 600, fontSize: "13px" }}>{event.user}</span>
                                             </div>
-                                            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "4px" }}>
-                                                {formatDate(event.date)}
+                                            <div style={{ fontSize: "0.7rem", color: "var(--color-text-muted)", marginTop: "0.25rem" }}>
+                                                {formatDateTime(event.date)}
                                             </div>
                                             {event.note && (
                                                 <div style={{
@@ -297,20 +313,21 @@ export default function ReviewProcessTimeline({
                     ))}
                 </div>
 
-                {currentStatus === "REVISION_REQUIRED" && (
+                {(currentStatus === "REVISION_REQUIRED" || currentStatus === "REJECTED") && (
                     <div style={{
                         marginTop: "1.5rem",
                         padding: "10px 14px",
-                        background: "rgba(249, 168, 37, 0.05)",
-                        border: "1px solid rgba(249, 168, 37, 0.2)",
+                        background: currentStatus === "REJECTED" ? "rgba(239, 68, 68, 0.05)" : "rgba(249, 168, 37, 0.05)",
+                        border: currentStatus === "REJECTED" ? "1px solid rgba(239, 68, 68, 0.2)" : "1px solid rgba(249, 168, 37, 0.2)",
                         borderRadius: "8px",
                         fontSize: "13px",
-                        color: "#d97706",
+                        color: currentStatus === "REJECTED" ? "#ef4444" : "#d97706",
                         display: "inline-flex",
                         alignItems: "center",
                         gap: "8px"
                     }}>
-                        <span style={{ fontSize: "16px" }}>⏳</span> 目前狀態：待修訂
+                        <span style={{ fontSize: "16px" }}>{currentStatus === "REJECTED" ? "❌" : "⏳"}</span>
+                        目前狀態：{currentStatus === "REJECTED" ? "已退回修改" : "待修訂"}
                     </div>
                 )}
             </div>

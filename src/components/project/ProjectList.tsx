@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import EditProjectButton from "./EditProjectButton";
 import DeleteProjectButton from "./DeleteProjectButton";
+import { formatDate } from "@/lib/date-utils";
 
 type Project = {
     id: number;
@@ -61,7 +62,7 @@ export default function ProjectList({ projects }: { projects: Project[] }) {
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem", fontSize: "0.85rem", color: "var(--color-text-muted)" }}>
                         <span>{project._count.items} Items</span>
-                        <span>{new Date(project.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
+                        <span>{formatDate(project.updatedAt)}</span>
                     </div>
                 </div>
             ))}

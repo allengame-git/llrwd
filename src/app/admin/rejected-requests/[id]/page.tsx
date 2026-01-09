@@ -1,4 +1,4 @@
-import { getRejectedRequestDetail } from "@/actions/rejected-requests";
+import { getRejectedRequestDetail } from "@/data/rejected-requests";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import RejectedRequestEditForm from "./RejectedRequestEditForm";

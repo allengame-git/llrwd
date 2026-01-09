@@ -2,6 +2,7 @@
 
 import { approveRequest, rejectRequest } from "@/actions/approval";
 import { useState } from "react";
+import { formatDate, formatDateTime } from "@/lib/date-utils";
 
 type RelatedItem = {
     id: number;
@@ -216,10 +217,7 @@ export default function ApprovalList({ requests, currentUsername, currentUserRol
                             }}>
                                 <span>編輯者：{submitterUsername}</span>
                                 <span>
-                                    {new Date(req.createdAt).toLocaleDateString('zh-TW', {
-                                        month: 'short',
-                                        day: 'numeric'
-                                    })}
+                                    {formatDate(req.createdAt)}
                                 </span>
                             </div>
 
@@ -287,7 +285,7 @@ export default function ApprovalList({ requests, currentUsername, currentUserRol
                                     {req.type === 'CREATE' ? '新增' : req.type === 'UPDATE' ? '編輯' : req.type === 'DELETE' ? '刪除' : req.type === 'PROJECT_UPDATE' ? '專案編輯' : req.type === 'PROJECT_DELETE' ? '專案刪除' : req.type} 申請詳情
                                 </h2>
                                 <div style={{ fontSize: "0.9rem", color: "var(--color-text-muted)" }}>
-                                    {new Date(req.createdAt).toLocaleString('zh-TW')}
+                                    {formatDateTime(req.createdAt)}
                                 </div>
                             </div>
                             <button

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
+import { formatDate } from '@/lib/date-utils';
 
 type IsoDoc = {
     id: number;
@@ -133,13 +135,12 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
                             >
                                 <td style={{ padding: '0.75rem 1rem' }}>
-                                    <span style={{
-                                        fontFamily: 'var(--font-geist-mono)',
-                                        color: 'var(--color-primary)',
-                                        fontWeight: 600
-                                    }}>
+                                    <Link
+                                        href={`/admin/history/detail/${doc.id}`}
+                                        className="text-primary hover:underline font-mono"
+                                    >
                                         {doc.item?.fullId || doc.itemFullId}
-                                    </span>
+                                    </Link>
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem' }}>
                                     <div style={{
@@ -164,7 +165,7 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
                                     </span>
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--color-text-muted)' }}>
-                                    {new Date(doc.createdAt).toLocaleDateString()}
+                                    {formatDate(doc.createdAt)}
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem' }}>
                                     <div>{doc.submittedBy?.username || doc.submitterName || '(已刪除)'}</div>
@@ -192,6 +193,18 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
                                                 </span>
                                             )}
                                         </div>
+                                    ) : doc.qcApproval?.status === 'REJECTED' ? (
+                                        <span style={{
+                                            padding: '0.2rem 0.5rem',
+                                            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                            color: '#ef4444',
+                                            borderRadius: '12px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600,
+                                            border: '1px solid rgba(239, 68, 68, 0.3)'
+                                        }}>
+                                            已退回
+                                        </span>
                                     ) : doc.qcApproval?.status === 'COMPLETED' ? (
                                         <span style={{
                                             padding: '0.2rem 0.5rem',

@@ -225,6 +225,7 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                     pmApprovedAt={record.qcApproval?.pmApprovedAt}
                     pmNote={record.qcApproval?.pmNote}
                     revisions={(record.qcApproval as any)?.revisions}
+                    currentStatus={record.qcApproval?.status}
                     reviewChain={(record as any).reviewChain}
                 />
             </div>
