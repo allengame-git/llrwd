@@ -24,13 +24,18 @@ export default function LoginForm() {
             });
 
             if (result?.error) {
-                setError("Invalid username or password");
+                // Check if the error message contains account locked info
+                if (result.error.includes("帳號已鎖定") || result.error.includes("密碼錯誤次數過多")) {
+                    setError(result.error);
+                } else {
+                    setError("帳號或密碼錯誤");
+                }
             } else {
                 router.refresh();
                 router.push("/");
             }
         } catch (err) {
-            setError("An unexpected error occurred");
+            setError("發生未預期的錯誤");
         } finally {
             setLoading(false);
         }

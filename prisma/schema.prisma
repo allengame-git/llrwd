@@ -45,6 +45,11 @@ model User {
   
   // Revision requests
   revisionRequests QCDocumentRevision[] @relation("RevisionRequester")
+  
+  // Login security
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  loginLogs           LoginLog[]
 }
 
 model Project {
@@ -375,4 +380,23 @@ model Notification {
   
   @@index([userId, isRead])
   @@index([userId, createdAt])
+}
+
+// Login Audit Log
+model LoginLog {
+  id         Int      @id @default(autoincrement())
+  userId     String?  // Present if login successful
+  username   String   // Attempted username
+  success    Boolean  // Whether login succeeded
+  ipAddress  String?  // Source IP address
+  userAgent  String?  // Browser info
+  failReason String?  // Reason for failure (optional)
+  createdAt  DateTime @default(now())
+  
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([username])
+  @@index([createdAt])
+  @@index([success])
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getUsers, createUser, updateUser, deleteUser } from "@/actions/users";
+import { getUsers, createUser, updateUser, deleteUser, unlockUser, getUsersWithLockStatus } from "@/actions/users";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import PasswordStrengthIndicator from "@/components/auth/PasswordStrengthIndicator";
 
 interface User {
     id: string;
@@ -13,6 +14,8 @@ interface User {
     isPM: boolean;
     signaturePath?: string | null;
     createdAt: Date;
+    failedLoginAttempts: number;
+    lockedUntil: Date | null;
 }
 
 export default function UserManagementPage() {
@@ -47,7 +50,7 @@ export default function UserManagementPage() {
 
     const fetchUsers = async () => {
         try {
-            const data = await getUsers();
+            const data = await getUsersWithLockStatus();
             setUsers(data);
         } catch (error) {
             console.error("Failed to fetch users", error);
@@ -146,6 +149,24 @@ export default function UserManagementPage() {
         }
     };
 
+    const handleUnlock = async (userId: string) => {
+        try {
+            const result = await unlockUser(userId);
+            if (result.error) {
+                alert(result.error);
+            } else {
+                fetchUsers();
+            }
+        } catch (err: any) {
+            console.error('Unlock user error:', err);
+            alert('解鎖失敗: ' + (err?.message || 'Unknown error'));
+        }
+    };
+
+    const isUserLocked = (user: User) => {
+        return user.lockedUntil && new Date(user.lockedUntil) > new Date();
+    };
+
     if (loading) return <div className="container" style={{ padding: '2rem' }}>Loading...</div>;
 
     if (session?.user?.role !== "ADMIN") {
@@ -210,17 +231,22 @@ export default function UserManagementPage() {
                         <tr style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "rgba(0,0,0,0.02)" }}>
                             <th style={{ padding: "1rem", textAlign: "left" }}>Username</th>
                             <th style={{ padding: "1rem", textAlign: "left" }}>Role & Qualifications</th>
+                            <th style={{ padding: "1rem", textAlign: "left" }}>狀態</th>
                             <th style={{ padding: "1rem", textAlign: "left" }}>Joined Info</th>
                             <th style={{ padding: "1rem", textAlign: "right" }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {users.map(user => (
-                            <tr key={user.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                            <tr key={user.id} style={{
+                                borderBottom: "1px solid var(--color-border)",
+                                backgroundColor: isUserLocked(user) ? "rgba(239, 68, 68, 0.05)" : undefined
+                            }}>
                                 <td style={{ padding: "1rem", fontWeight: "bold" }}>
                                     {user.username}
                                     {session.user.id === user.id && <span style={{ marginLeft: "0.5rem", fontSize: "0.8rem", color: "var(--color-primary)", border: "1px solid currentColor", padding: "2px 6px", borderRadius: "10px" }}>YOU</span>}
                                 </td>
+
                                 <td style={{ padding: "1rem" }}>
                                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                         <span style={{
@@ -260,10 +286,68 @@ export default function UserManagementPage() {
                                         )}
                                     </div>
                                 </td>
+                                <td style={{ padding: "1rem" }}>
+                                    {isUserLocked(user) ? (
+                                        <span style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.25rem",
+                                            padding: "4px 8px",
+                                            borderRadius: "4px",
+                                            backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                            color: "rgb(239, 68, 68)",
+                                            fontSize: "0.8rem",
+                                            fontWeight: "600"
+                                        }}>
+                                            🔒 已鎖定
+                                        </span>
+                                    ) : user.failedLoginAttempts > 0 ? (
+                                        <span style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.25rem",
+                                            padding: "4px 8px",
+                                            borderRadius: "4px",
+                                            backgroundColor: "rgba(245, 158, 11, 0.1)",
+                                            color: "rgb(245, 158, 11)",
+                                            fontSize: "0.8rem"
+                                        }}>
+                                            ⚠️ 失敗 {user.failedLoginAttempts}次
+                                        </span>
+                                    ) : (
+                                        <span style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.25rem",
+                                            padding: "4px 8px",
+                                            borderRadius: "4px",
+                                            backgroundColor: "rgba(34, 197, 94, 0.1)",
+                                            color: "rgb(34, 197, 94)",
+                                            fontSize: "0.8rem"
+                                        }}>
+                                            ✓ 正常
+                                        </span>
+                                    )}
+                                </td>
                                 <td style={{ padding: "1rem", color: "var(--color-text-muted)", fontSize: "0.9rem" }}>
                                     {new Date(user.createdAt).toLocaleDateString()}
                                 </td>
                                 <td style={{ padding: "1rem", textAlign: "right" }}>
+                                    {isUserLocked(user) && (
+                                        <button
+                                            onClick={() => handleUnlock(user.id)}
+                                            style={{
+                                                marginRight: "1rem",
+                                                color: "rgb(34, 197, 94)",
+                                                background: "transparent",
+                                                border: "none",
+                                                cursor: "pointer",
+                                                fontWeight: "500"
+                                            }}
+                                        >
+                                            解鎖
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => openEditModal(user)}
                                         disabled={false}
@@ -295,6 +379,7 @@ export default function UserManagementPage() {
                             </tr>
                         ))}
                     </tbody>
+
                 </table>
             </div>
 
@@ -329,6 +414,7 @@ export default function UserManagementPage() {
                                     onChange={e => setFormData({ ...formData, password: e.target.value })}
                                     style={{ width: "100%", padding: "0.5rem", borderRadius: "4px", border: "1px solid var(--color-border)" }}
                                 />
+                                <PasswordStrengthIndicator password={formData.password} />
                             </div>
                             <div style={{ marginBottom: "1.5rem" }}>
                                 <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Role</label>
@@ -469,6 +555,7 @@ export default function UserManagementPage() {
                                         {showEditPassword ? "👁️" : "👁️‍🗨️"}
                                     </button>
                                 </div>
+                                <PasswordStrengthIndicator password={formData.password} />
                             </div>
                             <div style={{ marginBottom: "1.5rem" }}>
                                 <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Role</label>
