@@ -432,8 +432,115 @@ export async function getIsoDocuments() {
             item: { select: { fullId: true, title: true } },
             submittedBy: { select: { username: true } },
             reviewedBy: { select: { username: true } },
+            qcApproval: { select: { status: true } }
+        }
+    });
+}
+
+/**
+ * Get ISO docs grouped by project with stats (supports search)
+ */
+export async function getIsoDocsGroupedByProject(query?: string) {
+    const whereProject: Prisma.ProjectWhereInput = {};
+    const whereHistory: Prisma.ItemHistoryWhereInput = { isoDocPath: { not: null } };
+
+    if (query) {
+        const lowerQuery = query.toLowerCase();
+        // If query exists, we want projects that MATCH the query OR contain docs matching the query
+        // BUT straightforward approach:
+        // Find projects where Title/Code matches query
+        // OR projects where they have ItemHistory matching query
+
+        // Let's broaden relation filter
+        whereProject.OR = [
+            { title: { contains: query, mode: 'insensitive' } },
+            { codePrefix: { contains: query, mode: 'insensitive' } },
+            {
+                itemHistories: {
+                    some: {
+                        isoDocPath: { not: null },
+                        OR: [
+                            { itemFullId: { contains: query, mode: 'insensitive' } },
+                            { itemTitle: { contains: query, mode: 'insensitive' } }
+                        ]
+                    }
+                }
+            }
+        ];
+    }
+
+    // Get all projects that have ISO docs (and match query if provided)
+    const projects = await prisma.project.findMany({
+        where: whereProject,
+        include: {
+            itemHistories: {
+                where: whereHistory,
+                select: { id: true, createdAt: true },
+                orderBy: { createdAt: 'desc' }
+            }
+        }
+    });
+
+    return projects
+        .filter(p => p.itemHistories.length > 0)
+        .map(p => ({
+            id: p.id,
+            title: p.title,
+            codePrefix: p.codePrefix,
+            isoDocCount: p.itemHistories.length,
+            lastUpdated: p.itemHistories[0]?.createdAt || null
+        }))
+        .sort((a, b) => {
+            if (!a.lastUpdated) return 1;
+            if (!b.lastUpdated) return -1;
+            return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
+        });
+}
+
+/**
+ * Get ISO documents for a specific project
+ */
+export async function getIsoDocumentsByProject(projectId: number) {
+    return await prisma.itemHistory.findMany({
+        where: {
+            projectId,
+            isoDocPath: { not: null }
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+            item: { select: { fullId: true, title: true } },
+            submittedBy: { select: { username: true } },
+            reviewedBy: { select: { username: true } },
             qcApproval: { select: { status: true, revisionCount: true } }
         }
     });
 }
 
+/**
+ * Get recent ISO document updates (supports search)
+ */
+export async function getRecentIsoDocUpdates(limit = 50, query?: string) {
+    const where: Prisma.ItemHistoryWhereInput = { isoDocPath: { not: null } };
+
+    if (query) {
+        where.OR = [
+            { itemFullId: { contains: query, mode: 'insensitive' } },
+            { itemTitle: { contains: query, mode: 'insensitive' } },
+            { project: { title: { contains: query, mode: 'insensitive' } } },
+            { project: { codePrefix: { contains: query, mode: 'insensitive' } } }
+        ];
+    }
+
+    return await prisma.itemHistory.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: {
+            project: { select: { title: true, codePrefix: true } },
+            item: { select: { fullId: true, title: true } },
+            submittedBy: { select: { username: true } },
+            reviewedBy: { select: { username: true } },
+            qcApproval: { select: { status: true, revisionCount: true } }
+        }
+    });
+}
