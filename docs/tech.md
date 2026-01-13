@@ -798,14 +798,49 @@ src/
 ### 13. S.O.P. & Structure
 
 1. **Wait for Approval**: 監聽 DB 變更或 Polling 與 Action 回傳 (目前採用 Action 回傳即時生成)
-2. **Retrieve Data**: 獲取完整 Item History, Project Info, User Info
-3. **Render PDF**:
+
+---
+
+## Phase 15: 系統備份與復原 (v1.7.0)
+
+### 15.1 備份策略
+
+**資料庫 (Database)**:
+
+- **格式**: 純 SQL 文字檔 (`.sql`)
+- **內容**: 包含 `INSERT INTO` 語句，支援 Truncate 後重新匯入
+- **工具**: 自製 `backup-utils.ts` (迭代 Table 與 Row)
+- **安全**: 僅 Admin 可執行，透過 Session 驗證
+
+**檔案 (Files)**:
+
+- **格式**: ZIP 壓縮檔 (`.zip`)
+- **工具**: `archiver` 套件
+- **範圍**: `/public/uploads` 與 `/public/iso_doc`
+
+### 15.2 復原策略
+
+**復原流程**:
+
+1. **上傳檔案**: 透過 API 接收 SQL 或 ZIP 檔案
+2. **驗證**: 檢查檔案格式與安全性 (Admin Session)
+3. **執行復原**:
+   - **Database**: 使用 `prisma.$executeRawUnsafe` 執行 SQL 指令 (包含 Transaction)
+   - **Files**: 使用 `unzipper` 解壓縮至暫存目錄，再覆蓋原目錄
+4. **清理**: 移除暫存檔案
+
+**緊急復原機制**:
+
+- 提供 `create-admin.js` 腳本，若還原後無使用者資料，可緊急建立 Admin 帳號
+
+1. **Retrieve Data**: 獲取完整 Item History, Project Info, User Info
+2. **Render PDF**:
    - 表頭: 專案資訊, 文件編號 QC-[Project]-[ID]
    - 內容: Item Title, Content (Snapshot), Attachments List
    - 簽核欄: 提交者 (System Stamp), 核准者 (System Stamp), QC (Pending), PM (Pending)
    - 浮水印: "CONFIDENTIAL"
-4. **Save**: 寫入 `/public/iso_doc/`
-5. **Update DB**: 建立 `QCDocumentApproval` 紀錄關聯
+3. **Save**: 寫入 `/public/iso_doc/`
+4. **Update DB**: 建立 `QCDocumentApproval` 紀錄關聯
 
 ### 狀態: ✅ 已完成
 
@@ -868,7 +903,7 @@ src/
 - **Component**: `CancelRequestButton` (Client Component)
 - **Confirmation**: `window.confirm` 二次確認
 
-2. DB 更新 ChangeRequest 狀態為 APPROVED
+1. DB 更新 ChangeRequest 狀態為 APPROVED
 2. `createHistoryRecord` 建立 ItemHistory
 3. `generateQCDocument` 觸發 PDF 生成
 4. 更新 ItemHistory 的 `isoDocPath`

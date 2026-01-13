@@ -540,3 +540,30 @@ const handleDrop = (e: React.DragEvent) => {
 - Client Component，處理 `window.confirm` 與 Loading 狀態
 
 ### 15.3 狀態: ✅ 已完成
+
+---
+
+## 16. Phase 15: 系統備份與復原
+
+> Status: ✅ Done (v1.7.0)
+
+### 16.1 需求分析
+
+- **目標**: 提供完整的系統災害復原能力 (Disaster Recovery)
+- **範圍**: 資料庫結構與資料、使用者上傳檔案、系統生成文件
+- **操作**: 僅限系統管理員 (Admin) 操作
+
+### 16.2 技術實作
+
+**API Endpoints**:
+
+- `GET /api/admin/backup/[type]`: 下載備份 (Stream Response)
+- `POST /api/admin/restore/[type]`: 上傳並還原
+
+**UI Components**:
+
+- `BackupRestoreSection.tsx`: 整合備份與復原控制項
+- **進度顯示**: 模擬進度條 (因為 Server Action 無法即時回傳進度)
+- **狀態管理**: Loading, Success, Error 狀態切換
+
+### 16.3 狀態: ✅ 已完成

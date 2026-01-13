@@ -5,6 +5,7 @@ import { getUsers, createUser, updateUser, deleteUser, unlockUser, getUsersWithL
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import PasswordStrengthIndicator from "@/components/auth/PasswordStrengthIndicator";
+import BackupRestoreSection from "@/components/admin/BackupRestoreSection";
 
 interface User {
     id: string;
@@ -648,6 +649,9 @@ export default function UserManagementPage() {
                     </div>
                 </div>
             )}
+
+            {/* 備份與復原區塊 */}
+            <BackupRestoreSection />
         </div>
     );
 }

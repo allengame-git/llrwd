@@ -57,8 +57,11 @@ next-env.d.ts
 # Agent folder
 .agent
 
-# Migration Data
+# Migration and Backup Data
 migration-data/
 *.sql
+*.zip
+temp-restore-*
 .env.postgres
 rms_db_dump.sql
+rms_db.sql

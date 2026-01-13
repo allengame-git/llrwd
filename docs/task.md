@@ -291,3 +291,22 @@
 - [x] UI Component: `CancelRequestButton` (Client Component)
 - [x] 整合至 `/admin/rejected-requests` 頁面
 - [x] 權限邏輯: 僅限原提交者或 Admin 可執行
+
+---
+
+## Phase 15: 系統備份與復原 (v1.7.0) ✅
+
+### Phase 15.1: 備份功能 ✅
+
+- [x] 資料庫備份 (PostgreSQL SQL Export)
+- [x] 檔案備份 (Uploads, ISO Docs ZIP)
+- [x] 管理者備份介面 (Admin Dashboard UI)
+- [x] 串流下載 (Stream Response)
+
+### Phase 15.2: 復原功能 ✅
+
+- [x] 資料庫復原 (SQL Import with Session Validation)
+- [x] 檔案復原 (ZIP Extract)
+- [x] 進度條與狀態顯示 (Progress Bar)
+- [x] 備份檔案完整性檢查
+- [x] 復原完成後自動登出機制
