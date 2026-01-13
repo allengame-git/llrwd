@@ -5,16 +5,23 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { copyProject } from "@/actions/project";
 
+interface Category {
+    id: number;
+    name: string;
+}
+
 interface CopyProjectButtonProps {
     project: {
         id: number;
         title: string;
         description: string | null;
         codePrefix: string;
+        categoryId: number | null;
     };
+    categories: Category[];
 }
 
-export default function CopyProjectButton({ project }: CopyProjectButtonProps) {
+export default function CopyProjectButton({ project, categories }: CopyProjectButtonProps) {
     const router = useRouter();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,9 +34,10 @@ export default function CopyProjectButton({ project }: CopyProjectButtonProps) {
     }, []);
 
     const [formData, setFormData] = useState({
-        title: `${project.title} (副本)`,
+        title: "",
         codePrefix: "",
-        description: project.description || ""
+        description: "",
+        categoryId: project.categoryId?.toString() || ""
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -42,7 +50,8 @@ export default function CopyProjectButton({ project }: CopyProjectButtonProps) {
                 project.id,
                 formData.title,
                 formData.codePrefix,
-                formData.description
+                formData.description,
+                formData.categoryId ? parseInt(formData.categoryId, 10) : null
             );
 
             if (result.error) {
@@ -62,7 +71,8 @@ export default function CopyProjectButton({ project }: CopyProjectButtonProps) {
         setFormData({
             title: "",
             codePrefix: "",
-            description: ""
+            description: "",
+            categoryId: project.categoryId?.toString() || ""
         });
         setError("");
         setIsModalOpen(true);
@@ -200,6 +210,29 @@ export default function CopyProjectButton({ project }: CopyProjectButtonProps) {
                                 }}>
                                     僅限大寫英文字母與數字
                                 </p>
+                            </div>
+
+                            <div>
+                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>
+                                    分區
+                                </label>
+                                <select
+                                    value={formData.categoryId}
+                                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                                    style={{
+                                        width: "100%",
+                                        padding: "0.75rem",
+                                        borderRadius: "var(--radius-sm)",
+                                        border: "1px solid var(--color-border)",
+                                        background: "var(--color-bg-base)",
+                                        color: "var(--color-text-main)"
+                                    }}
+                                >
+                                    <option value="">未分類</option>
+                                    {categories.map((cat) => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div>

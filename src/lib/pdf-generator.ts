@@ -2,7 +2,6 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import * as fs from 'fs';
 import * as path from 'path';
-// import puppeteer from 'puppeteer'; // Dynamic import used instead
 
 // Types
 interface ItemHistory {
@@ -47,359 +46,278 @@ interface Item {
     title: string;
 }
 
-// Helper to generate PDF from HTML content using Puppeteer
-// Helper to generate Full History Page PDF using Puppeteer
-const generateHistoryPagePDF = async (history: ItemHistory): Promise<Uint8Array | null> => {
-    try {
-        const puppeteer = (await import('puppeteer')).default;
-        const browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
-        const page = await browser.newPage();
+/**
+ * Generate History Summary Pages using pdf-lib (no Puppeteer)
+ * Returns additional pages to be appended to the main QC document
+ */
+const generateHistorySummaryPages = async (
+    history: ItemHistory,
+    pdfDoc: PDFDocument,
+    font: any
+): Promise<void> => {
+    const { width, height } = { width: 595.28, height: 841.89 }; // A4
+    const margin = 50;
+    const lineHeight = 16;
+    const black = rgb(0, 0, 0);
+    const gray = rgb(0.5, 0.5, 0.5);
+    const blue = rgb(0, 0.4, 0.6);
+    const green = rgb(0.1, 0.6, 0.3);
+    const red = rgb(0.8, 0.2, 0.2);
 
-        // Parse Data
-        const snapshot = JSON.parse(history.snapshot);
-        const diff = history.diff ? JSON.parse(history.diff) : null;
+    // Date Formatter
+    const formatDate = (date: Date | string) => {
+        const d = new Date(date);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const h = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `${y}/${m}/${day} ${h}:${min}`;
+    };
 
-        // Reconstruct Previous Snapshot (if UPDATE)
-        let previousSnapshot = null;
-        if (diff && history.changeType === 'UPDATE') {
-            previousSnapshot = {
-                ...snapshot,
-                title: diff.title?.old ?? snapshot.title,
-                content: diff.content?.old ?? snapshot.content,
-                attachments: diff.attachments?.old ?? snapshot.attachments,
-                relatedItems: diff.relatedItems?.old ?? snapshot.relatedItems,
-            };
+    // Strip HTML tags for plain text display
+    const stripHtml = (html: string | null | undefined): string => {
+        if (!html) return '(無內容)';
+        return html
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/\s+/g, ' ')
+            .trim() || '(無內容)';
+    };
+
+    // Create new page
+    let page = pdfDoc.addPage([width, height]);
+    let y = height - margin;
+
+    // Helper: Check if need new page
+    const checkNewPage = (neededSpace: number = 100) => {
+        if (y < margin + neededSpace) {
+            page = pdfDoc.addPage([width, height]);
+            y = height - margin;
         }
+    };
 
-        // Helper to render Diff Section
-        const renderDiffSection = () => {
-            if (!diff) return '';
-            let html = '<div class="section"><h2>變更內容比對</h2>';
-
-            // Helper to render relatedItems as formatted list
-            const renderRelatedItems = (items: any[] | null) => {
-                if (!items || items.length === 0) return '<em>(無關聯項目)</em>';
-                return items.map(item => `
-                    <div style="padding: 8px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px; background: rgba(255,255,255,0.5);">
-                        <strong style="color: #00838f;">${item.fullId || ''}</strong>
-                        ${item.title ? ` - ${item.title}` : ''}
-                        ${item.description ? `<div style="font-size: 12px; color: #666; margin-top: 4px;">${item.description}</div>` : ''}
-                    </div>
-                `).join('');
-            };
-
-            for (const [key, value] of Object.entries(diff) as [string, any][]) {
-                const label = key === 'content' ? '內容'
-                    : key === 'title' ? '標題'
-                        : key === 'relatedItems' ? '關聯項目'
-                            : key === 'attachments' ? '參考文獻'
-                                : key;
-
-                // Determine how to render the content based on field type
-                let oldContent: string;
-                let newContent: string;
-
-                if (key === 'content') {
-                    oldContent = value.old || '<em>(空白)</em>';
-                    newContent = value.new || '<em>(空白)</em>';
-                } else if (key === 'relatedItems') {
-                    oldContent = renderRelatedItems(value.old);
-                    newContent = renderRelatedItems(value.new);
-                } else if (key === 'attachments') {
-                    // Handle attachments/references - show file names
-                    const renderAttachments = (attachments: any) => {
-                        if (!attachments) return '<em>(無參考文獻)</em>';
-                        try {
-                            const files = typeof attachments === 'string' ? JSON.parse(attachments) : attachments;
-                            if (!Array.isArray(files) || files.length === 0) return '<em>(無參考文獻)</em>';
-                            return files.map((f: any) => `
-                                <div style="padding: 4px 8px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;">
-                                    📎 ${f.name || f.dataName || f.fileName || '未命名'}
-                                    ${f.author ? `<span style="color: #666; font-size: 12px;"> - ${f.author}</span>` : ''}
-                                    ${f.citation ? `<div style="font-size: 11px; color: #888; margin-top: 2px;">${f.citation}</div>` : ''}
-                                </div>
-                            `).join('');
-                        } catch {
-                            return '<em>(無參考文獻)</em>';
-                        }
-                    };
-                    oldContent = renderAttachments(value.old);
-                    newContent = renderAttachments(value.new);
-                } else {
-                    // Default: stringify other values
-                    oldContent = typeof value.old === 'object' ? JSON.stringify(value.old, null, 2) : String(value.old ?? '');
-                    newContent = typeof value.new === 'object' ? JSON.stringify(value.new, null, 2) : String(value.new ?? '');
-                }
-
-                html += `
-                    <div class="diff-row">
-                        <div class="diff-header">${label}</div>
-                        <div class="diff-grid">
-                            <div class="diff-old">
-                                <div class="diff-label error">修改前</div>
-                                <div class="content-box">${oldContent}</div>
-                            </div>
-                            <div class="diff-new">
-                                <div class="diff-label success">修改後</div>
-                                <div class="content-box">${newContent}</div>
-                            </div>
-                        </div>
-                    </div>
-                 `;
-            }
-            html += '</div>';
-            return html;
-        };
-
-        // Helper to render Review Timeline (Round-based)
-        const renderReviewTimeline = () => {
-            const rounds: any[][] = [];
-
-            // 1. Process reviewChain (Generic requests)
-            if (history.reviewChain && history.reviewChain.length > 0) {
-                const sortedChain = [...history.reviewChain].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-                for (const req of sortedChain) {
-                    const roundEvents: any[] = [];
-                    roundEvents.push({
-                        type: req.previousRequestId ? "重新提交" : "提交",
-                        user: req.submittedBy?.username || req.submitterName || "提交者",
-                        date: new Date(req.createdAt),
-                        note: req.submitReason,
-                        status: "info"
-                    });
-                    if (req.status === "APPROVED" && req.reviewedBy) {
-                        roundEvents.push({
-                            type: "核准",
-                            user: req.reviewedBy.username,
-                            date: new Date(req.updatedAt),
-                            note: req.reviewNote,
-                            status: "success"
-                        });
-                    } else if ((req.status === "REJECTED" || req.status === "RESUBMITTED") && req.reviewedBy) {
-                        roundEvents.push({
-                            type: "退回修改",
-                            user: req.reviewedBy.username,
-                            date: new Date(req.updatedAt),
-                            note: req.reviewNote,
-                            status: "danger"
-                        });
-                    }
-                    rounds.push(roundEvents);
-                }
-            } else {
-                // Fallback for direct ISO flow without previous chain records
-                rounds.push([{
-                    type: "提交",
-                    user: history.submittedBy?.username || "提交者",
-                    date: new Date(history.submissionDate || history.createdAt),
-                    note: history.submitReason,
-                    status: "info"
-                }]);
-                if (history.reviewedBy) {
-                    rounds[0].push({
-                        type: "核准",
-                        user: history.reviewedBy.username,
-                        date: new Date(history.createdAt),
-                        note: history.reviewNote,
-                        status: "success"
-                    });
-                }
-            }
-
-            // Append QC/PM to last round
-            const lastRound = rounds[rounds.length - 1] || [];
-            if (history.qcUser && history.qcDate) {
-                lastRound.push({ type: "QC 簽核", user: history.qcUser, date: new Date(history.qcDate), note: history.qcNote, status: "success" });
-            }
-            if (history.pmUser && history.pmDate) {
-                lastRound.push({ type: "PM 簽核", user: history.pmUser, date: new Date(history.pmDate), note: history.pmNote, status: "success" });
-            }
-
-            // 2. Process Revisions (ISO flow)
-            if (history.revisions && history.revisions.length > 0) {
-                for (const rev of history.revisions) {
-                    const revRound: any[] = [];
-                    revRound.push({
-                        type: "退回修改",
-                        user: rev.requestedBy?.username || "審核者",
-                        date: new Date(rev.requestedAt),
-                        note: rev.requestNote,
-                        status: "warning"
-                    });
-                    if (rev.resolvedAt) {
-                        revRound.push({
-                            type: "重新提交",
-                            user: history.submittedBy?.username || "提交者",
-                            date: new Date(rev.resolvedAt),
-                            note: `完成第 ${rev.revisionNumber} 次修訂`,
-                            status: "info"
-                        });
-                    }
-                    rounds.push(revRound);
-                }
-            }
-
-            if (rounds.length === 0) return '';
-
-            let html = '<div class="section"><h2>審核歷程時間軸</h2><div class="timeline-container">';
-            rounds.forEach((round, idx) => {
-                html += `<div class="timeline-round">`;
-                html += `<div class="round-title">第 ${idx + 1} 次審核</div>`;
-                round.forEach(ev => {
-                    const color = ev.status === 'success' ? '#10b981' : ev.status === 'warning' ? '#f59e0b' : ev.status === 'danger' ? '#ef4444' : '#3b82f6';
-                    html += `
-                        <div class="timeline-event">
-                            <div class="event-dot" style="background: ${color}"></div>
-                            <div class="event-content">
-                                <div class="event-header">
-                                    <span class="event-type" style="color: ${color}; border-color: ${color}40; background: ${color}15">${ev.type}</span>
-                                    <span class="event-user">${ev.user}</span>
-                                </div>
-                                <div class="event-date">${new Date(ev.date).toLocaleString('zh-TW')}</div>
-                                ${ev.note ? `<div class="event-note">${(ev.type === '提交' || ev.type === '重新提交') ? '原因：' : '意見：'}${ev.note}</div>` : ''}
-                            </div>
-                        </div>
-                    `;
-                });
-                html += `</div>`;
-            });
-            html += '</div></div>';
-            return html;
-        };
-
-        // Helper to render Snapshot Section
-        const renderSnapshotSection = (title: string, data: any) => {
-            if (!data) return '';
-
-            // Helper to format attachments/references
-            const formatAttachments = (attachments: any) => {
-                if (!attachments) return '';
-                try {
-                    const files = typeof attachments === 'string' ? JSON.parse(attachments) : attachments;
-                    if (!Array.isArray(files) || files.length === 0) return '';
-                    const fileList = files.map((f: any) => `
-                        <div style="padding: 6px 10px; margin: 4px 0; background: #f5f5f5; border-radius: 4px; border-left: 3px solid #00838f;">
-                            📎 ${f.name || f.dataName || f.fileName || '未命名檔案'}
-                            ${f.author ? `<span style="color: #666; font-size: 12px;"> - ${f.author}</span>` : ''}
-                            ${f.citation ? `<div style="font-size: 12px; color: #666; margin-top: 2px;">${f.citation}</div>` : ''}
-                        </div>
-                    `).join('');
-                    return `<div class="field-group"><label>參考文獻</label><div class="value">${fileList}</div></div>`;
-                } catch {
-                    return '';
-                }
-            };
-
-            return `
-                <div class="section">
-                    <h2>${title}</h2>
-                    <div class="field-group">
-                        <label>標題</label>
-                        <div class="value">${data.title}</div>
-                    </div>
-                    <div class="field-group">
-                        <label>內容</label>
-                        <div class="value rich-text">${data.content || '(無內容)'}</div>
-                    </div>
-                    ${formatAttachments(data.attachments)}
-                </div>
-             `;
-        };
-
-
-        const htmlContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <style>
-                    body { font-family: "Arial Unicode MS", Arial, sans-serif; padding: 40px; font-size: 14px; line-height: 1.6; color: #333; }
-                    h1 { font-size: 24px; margin-bottom: 5px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                    h2 { font-size: 18px; margin-top: 25px; margin-bottom: 15px; border-left: 4px solid #00838f; padding-left: 10px; background: #f9f9f9; padding-top: 5px; padding-bottom: 5px; }
-                    .header-info { color: #666; font-size: 14px; margin-bottom: 20px; }
-                    
-                    .review-card { background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-                    .review-col { padding-left: 15px; border-left: 3px solid #ddd; }
-                    .review-col.submitter { border-color: #fca5a5; } 
-                    .review-col.reviewer { border-color: #86efac; }
-                    .review-col.qc { border-color: #93c5fd; }
-                    .review-col.pm { border-color: #fde047; }
-                    
-                    .label { font-size: 12px; font-weight: bold; color: #666; text-transform: uppercase; margin-bottom: 5px; }
-                    .value { font-weight: bold; font-size: 14px; color: #000; }
-                    .date { font-size: 12px; color: #888; margin-top: 2px; }
-                    .note-box { background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px; margin-top: 8px; font-size: 12px; }
-                    
-                    .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-                    .diff-old { background: #fff5f5; border: 1px solid #fed7d7; padding: 10px; border-radius: 6px; }
-                    .diff-new { background: #f0fff4; border: 1px solid #c6f6d5; padding: 10px; border-radius: 6px; }
-                    .diff-label { font-size: 12px; font-weight: bold; margin-bottom: 5px; }
-                    .diff-label.error { color: #c53030; }
-                    .diff-label.success { color: #2f855a; }
-                    .content-box { font-size: 13px; overflow-wrap: break-word; }
-                    
-                    .field-group { margin-bottom: 15px; }
-                    .field-group label { display: block; font-size: 12px; font-weight: bold; color: #666; margin-bottom: 5px; }
-                    .rich-text { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 6px; }
-                    
-                    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-                    th, td { border: 1px solid #ddd; padding: 6px; }
-                    img { max-width: 100%; }
-                    
-                    .revision-table { font-size: 12px; }
-                    .revision-table th { background: #f5f5f5; font-weight: 600; }
-                    .revision-table td { vertical-align: top; }
-
-                    /* Timeline Styles */
-                    .timeline-container { display: block; }
-                    .timeline-round { border: 1px dashed #ddd; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #fff; }
-                    .round-title { font-size: 12px; font-weight: bold; color: #666; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-                    .timeline-event { position: relative; padding-left: 20px; border-left: 2px solid #eee; margin-bottom: 15px; }
-                    .event-dot { position: absolute; left: -6px; top: 4px; width: 10px; height: 10px; borderRadius: 50%; border: 2px solid #fff; }
-                    .event-header { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
-                    .event-type { font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 600; border: 1px solid; }
-                    .event-user { font-weight: bold; font-size: 13px; }
-                    .event-date { font-size: 11px; color: #888; margin-bottom: 3px; }
-                    .event-note { font-size: 12px; background: #f9f9f9; padding: 6px 10px; border-radius: 4px; border: 1px solid #eee; }
-                </style>
-            </head>
-            <body>
-                <h1>歷史版本詳情: v${history.version}</h1>
-                <div class="header-info">
-                    ${history.itemFullId} - ${history.itemTitle} | 變更類型: ${history.changeType}
-                </div>
-
-                <!-- Review card removed - moved to page 1 -->
-
-                ${renderReviewTimeline()}
-
-                ${renderDiffSection()}
-                
-                ${previousSnapshot ? renderSnapshotSection(`變更前快照 (v${history.version - 1})`, previousSnapshot) : ''}
-                
-                ${(history.changeType === 'CREATE' || history.changeType === 'DELETE') ? renderSnapshotSection(`${history.changeType === 'CREATE' ? '建立' : '刪除'}快照`, snapshot) : ''}
-            </body>
-            </html>
-        `;
-
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-
-        const pdfBuffer = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' }
+    // Helper: Draw section title
+    const drawSectionTitle = (title: string) => {
+        checkNewPage(60);
+        page.drawRectangle({
+            x: margin,
+            y: y - 5,
+            width: width - 2 * margin,
+            height: 25,
+            color: rgb(0.95, 0.95, 0.95)
         });
+        page.drawText(title, { x: margin + 10, y: y, size: 12, font, color: blue });
+        y -= 35;
+    };
 
-        await browser.close();
-        return pdfBuffer;
-    } catch (error) {
-        console.error('Puppeteer PDF generation failed:', error);
-        return null;
+    // Helper: Draw key-value line
+    const drawField = (label: string, value: string, labelColor = gray) => {
+        checkNewPage(25);
+        page.drawText(label, { x: margin, y, size: 9, font, color: labelColor });
+
+        // Wrap long values
+        const maxWidth = width - margin - 130;
+        const lines = wrapText(value, font, 9, maxWidth);
+        for (let i = 0; i < Math.min(lines.length, 5); i++) { // Limit to 5 lines
+            page.drawText(lines[i], { x: margin + 80, y, size: 9, font, color: black });
+            if (i < lines.length - 1) y -= lineHeight;
+        }
+        if (lines.length > 5) {
+            y -= lineHeight;
+            page.drawText('...（內容過長已截斷）', { x: margin + 80, y, size: 8, font, color: gray });
+        }
+        y -= lineHeight + 5;
+    };
+
+    // ==========================================
+    // Page Header
+    // ==========================================
+    page.drawText(`歷史版本詳情: v${history.version}`, { x: margin, y, size: 16, font, color: black });
+    y -= 25;
+    page.drawText(`${history.itemFullId} - ${history.itemTitle}`, { x: margin, y, size: 10, font, color: gray });
+    y -= 15;
+
+    const changeTypeMap: { [k: string]: string } = { 'CREATE': '新增', 'UPDATE': '修改', 'DELETE': '刪除', 'RESTORE': '還原' };
+    page.drawText(`變更類型: ${changeTypeMap[history.changeType] || history.changeType}`, { x: margin, y, size: 10, font, color: gray });
+    y -= 30;
+
+    // ==========================================
+    // Section 1: 審核歷程時間軸
+    // ==========================================
+    drawSectionTitle('審核歷程時間軸');
+
+    // Build timeline events
+    type TimelineEvent = { type: string; user: string; date: Date; note?: string; status: 'info' | 'success' | 'warning' | 'danger' };
+    const events: TimelineEvent[] = [];
+
+    if (history.reviewChain && history.reviewChain.length > 0) {
+        const sortedChain = [...history.reviewChain].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        for (const req of sortedChain) {
+            events.push({
+                type: req.previousRequestId ? '重新提交' : '提交',
+                user: req.submittedBy?.username || req.submitterName || '提交者',
+                date: new Date(req.createdAt),
+                note: req.submitReason,
+                status: 'info'
+            });
+            if (req.status === 'APPROVED' && req.reviewedBy) {
+                events.push({
+                    type: '核准',
+                    user: req.reviewedBy.username,
+                    date: new Date(req.updatedAt),
+                    note: req.reviewNote,
+                    status: 'success'
+                });
+            } else if ((req.status === 'REJECTED' || req.status === 'RESUBMITTED') && req.reviewedBy) {
+                events.push({
+                    type: '退回修改',
+                    user: req.reviewedBy.username,
+                    date: new Date(req.updatedAt),
+                    note: req.reviewNote,
+                    status: 'danger'
+                });
+            }
+        }
+    } else {
+        // Fallback
+        events.push({
+            type: '提交',
+            user: history.submittedBy?.username || '提交者',
+            date: new Date(history.submissionDate || history.createdAt),
+            note: history.submitReason || undefined,
+            status: 'info'
+        });
+        if (history.reviewedBy) {
+            events.push({
+                type: '核准',
+                user: history.reviewedBy.username,
+                date: new Date(history.createdAt),
+                note: history.reviewNote || undefined,
+                status: 'success'
+            });
+        }
     }
+
+    // Add QC/PM
+    if (history.qcUser && history.qcDate) {
+        events.push({ type: 'QC 簽核', user: history.qcUser, date: new Date(history.qcDate), note: history.qcNote || undefined, status: 'success' });
+    }
+    if (history.pmUser && history.pmDate) {
+        events.push({ type: 'PM 簽核', user: history.pmUser, date: new Date(history.pmDate), note: history.pmNote || undefined, status: 'success' });
+    }
+
+    // Draw timeline events
+    for (const ev of events) {
+        checkNewPage(50);
+        const statusColor = ev.status === 'success' ? green : ev.status === 'danger' ? red : ev.status === 'warning' ? rgb(0.9, 0.6, 0) : blue;
+
+        // Bullet
+        page.drawCircle({ x: margin + 5, y: y + 3, size: 4, color: statusColor });
+
+        // Type + User
+        page.drawText(`[${ev.type}]`, { x: margin + 15, y, size: 9, font, color: statusColor });
+        page.drawText(ev.user, { x: margin + 80, y, size: 9, font, color: black });
+        page.drawText(formatDate(ev.date), { x: width - margin - 100, y, size: 8, font, color: gray });
+        y -= lineHeight;
+
+        // Note
+        if (ev.note) {
+            const noteLines = wrapText(ev.note, font, 8, width - margin - 100);
+            for (let i = 0; i < Math.min(noteLines.length, 3); i++) {
+                page.drawText(noteLines[i], { x: margin + 20, y, size: 8, font, color: gray });
+                y -= lineHeight - 2;
+            }
+        }
+        y -= 8;
+    }
+
+    // ==========================================
+    // Section 2: 變更內容比對 (if UPDATE)
+    // ==========================================
+    const diff = history.diff ? JSON.parse(history.diff) : null;
+    if (diff && history.changeType === 'UPDATE') {
+        drawSectionTitle('變更內容比對');
+
+        for (const [key, value] of Object.entries(diff) as [string, any][]) {
+            checkNewPage(80);
+            const label = key === 'content' ? '內容' : key === 'title' ? '標題' : key === 'relatedItems' ? '關聯項目' : key === 'attachments' ? '參考文獻' : key;
+
+            page.drawText(`【${label}】`, { x: margin, y, size: 10, font, color: black });
+            y -= lineHeight + 5;
+
+            // Old value
+            page.drawText('修改前:', { x: margin + 10, y, size: 9, font, color: red });
+            y -= lineHeight;
+            const oldText = key === 'content' ? stripHtml(value.old) : (typeof value.old === 'object' ? JSON.stringify(value.old) : String(value.old || '(空白)'));
+            const oldLines = wrapText(oldText.slice(0, 500), font, 8, width - margin - 80);
+            for (let i = 0; i < Math.min(oldLines.length, 4); i++) {
+                page.drawText(oldLines[i], { x: margin + 20, y, size: 8, font, color: gray });
+                y -= lineHeight - 2;
+            }
+            if (oldText.length > 500) {
+                page.drawText('...（已截斷）', { x: margin + 20, y, size: 8, font, color: gray });
+                y -= lineHeight;
+            }
+            y -= 5;
+
+            // New value
+            page.drawText('修改後:', { x: margin + 10, y, size: 9, font, color: green });
+            y -= lineHeight;
+            const newText = key === 'content' ? stripHtml(value.new) : (typeof value.new === 'object' ? JSON.stringify(value.new) : String(value.new || '(空白)'));
+            const newLines = wrapText(newText.slice(0, 500), font, 8, width - margin - 80);
+            for (let i = 0; i < Math.min(newLines.length, 4); i++) {
+                page.drawText(newLines[i], { x: margin + 20, y, size: 8, font, color: gray });
+                y -= lineHeight - 2;
+            }
+            if (newText.length > 500) {
+                page.drawText('...（已截斷）', { x: margin + 20, y, size: 8, font, color: gray });
+                y -= lineHeight;
+            }
+            y -= 15;
+        }
+    }
+
+    // ==========================================
+    // Section 3: 快照摘要
+    // ==========================================
+    const snapshot = JSON.parse(history.snapshot);
+    drawSectionTitle(history.changeType === 'CREATE' ? '建立快照' : history.changeType === 'DELETE' ? '刪除快照' : '當前快照');
+
+    drawField('標題:', snapshot.title || '(無標題)');
+
+    // Content (stripped HTML)
+    const contentText = stripHtml(snapshot.content);
+    drawField('內容摘要:', contentText.length > 800 ? contentText.slice(0, 800) + '...（詳見系統）' : contentText);
+
+    // Attachments summary
+    if (snapshot.attachments) {
+        try {
+            const files = typeof snapshot.attachments === 'string' ? JSON.parse(snapshot.attachments) : snapshot.attachments;
+            if (Array.isArray(files) && files.length > 0) {
+                const fileNames = files.map((f: any) => f.name || f.dataName || f.fileName || '未命名').join(', ');
+                drawField('參考文獻:', `共 ${files.length} 項 - ${fileNames.slice(0, 200)}${fileNames.length > 200 ? '...' : ''}`);
+            }
+        } catch { /* ignore */ }
+    }
+
+    // Related items summary
+    if (snapshot.relatedItems && Array.isArray(snapshot.relatedItems) && snapshot.relatedItems.length > 0) {
+        const relatedStr = snapshot.relatedItems.map((r: any) => r.fullId || r.title || '項目').join(', ');
+        drawField('關聯項目:', `共 ${snapshot.relatedItems.length} 項 - ${relatedStr.slice(0, 200)}${relatedStr.length > 200 ? '...' : ''}`);
+    }
+
+    // Footer note
+    checkNewPage(40);
+    y -= 20;
+    page.drawLine({ start: { x: margin, y: y + 10 }, end: { x: width - margin, y: y + 10 }, thickness: 0.5, color: gray });
+    y -= 10;
+    page.drawText('※ 此為簡化版歷史摘要，完整內容請於系統中查閱。', { x: margin, y, size: 8, font, color: gray });
 };
+
 
 export const generateQCDocument = async (
     history: ItemHistory,
@@ -603,30 +521,16 @@ export const generateQCDocument = async (
         drawSigBox(width - margin - sigBoxWidth, '計畫主管核定 (PM)', history.pmUser, history.pmNote, history.pmDate);
 
         // ==========================================
-        // ATTACHMENT LOGIC (Puppeteer)
+        // ATTACHMENT: History Summary Pages (pdf-lib, no Puppeteer)
         // Only attach if PM Approved (pmDate is present)
         // ==========================================
         if (history.pmDate) {
             try {
-                // Generate History Page PDF
-                const contentPdfBytes = await generateHistoryPagePDF(history);
-
-                if (contentPdfBytes) {
-                    // Load the generated PDF
-                    const contentPdf = await PDFDocument.load(contentPdfBytes);
-
-                    // Copy all pages
-                    const contentPages = await pdfDoc.copyPages(contentPdf, contentPdf.getPageIndices());
-
-                    // Add each page to the main document
-                    for (const contentPage of contentPages) {
-                        pdfDoc.addPage(contentPage);
-                    }
-
-                    console.log(`[generateQCDocument] Attached ${contentPages.length} pages of history view.`);
-                }
+                // Generate History Summary Pages directly into pdfDoc
+                await generateHistorySummaryPages(history, pdfDoc, font);
+                console.log('[generateQCDocument] Added history summary pages.');
             } catch (err) {
-                console.error('[generateQCDocument] Failed to attach history PDF:', err);
+                console.error('[generateQCDocument] Failed to generate history summary:', err);
                 // Continue saving without attachment if this fails
             }
         }

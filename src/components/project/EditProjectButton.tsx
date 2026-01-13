@@ -2,20 +2,29 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { submitUpdateProjectRequest } from "@/actions/approval";
+import { useRouter } from "next/navigation";
+import { updateProject } from "@/actions/project";
+
+interface Category {
+    id: number;
+    name: string;
+}
 
 interface EditProjectButtonProps {
     project: {
         id: number;
         title: string;
         description: string | null;
+        categoryId: number | null;
     };
+    categories: Category[];
 }
 
-export default function EditProjectButton({ project }: EditProjectButtonProps) {
+export default function EditProjectButton({ project, categories }: EditProjectButtonProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [title, setTitle] = useState(project.title);
     const [description, setDescription] = useState(project.description || "");
+    const [categoryId, setCategoryId] = useState(project.categoryId?.toString() || "");
     const [status, setStatus] = useState<{ message?: string; error?: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -30,6 +39,7 @@ export default function EditProjectButton({ project }: EditProjectButtonProps) {
         if (isModalOpen) {
             setTitle(project.title);
             setDescription(project.description || "");
+            setCategoryId(project.categoryId?.toString() || "");
             setStatus(null);
         }
     }, [isModalOpen, project]);
@@ -39,13 +49,13 @@ export default function EditProjectButton({ project }: EditProjectButtonProps) {
         setIsSubmitting(true);
         setStatus(null);
 
-        const formData = new FormData();
-        formData.append("projectId", project.id.toString());
-        formData.append("title", title);
-        formData.append("description", description);
-
         try {
-            const result = await submitUpdateProjectRequest({}, formData);
+            const result = await updateProject(
+                project.id,
+                title,
+                description,
+                categoryId ? parseInt(categoryId, 10) : null
+            );
             if (result.error) {
                 setStatus({ error: result.error });
             } else {
@@ -54,7 +64,7 @@ export default function EditProjectButton({ project }: EditProjectButtonProps) {
                     setIsModalOpen(false);
                     setStatus(null);
                     window.location.reload();
-                }, 1500);
+                }, 1000);
             }
         } catch (err) {
             setStatus({ error: "發生未預期的錯誤。" });
@@ -138,6 +148,24 @@ export default function EditProjectButton({ project }: EditProjectButtonProps) {
                                 color: "var(--color-text-main)", resize: "vertical"
                             }}
                         />
+                    </div>
+
+                    <div>
+                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>分區</label>
+                        <select
+                            value={categoryId}
+                            onChange={(e) => setCategoryId(e.target.value)}
+                            style={{
+                                width: "100%", padding: "0.75rem", borderRadius: "var(--radius-sm)",
+                                border: "1px solid var(--color-border)", background: "var(--color-bg-base)",
+                                color: "var(--color-text-main)"
+                            }}
+                        >
+                            <option value="">未分類</option>
+                            {categories.map((cat) => (
+                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "0.5rem" }}>
