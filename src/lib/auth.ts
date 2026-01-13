@@ -121,6 +121,8 @@ export const authOptions: NextAuthOptions = {
                     id: user.id,
                     username: user.username,
                     role: user.role,
+                    isPM: user.isPM,
+                    isQC: user.isQC,
                 };
             },
         }),
@@ -131,6 +133,8 @@ export const authOptions: NextAuthOptions = {
                 session.user.id = token.id as string;
                 session.user.role = token.role as string;
                 session.user.username = token.username as string;
+                session.user.isPM = token.isPM as boolean;
+                session.user.isQC = token.isQC as boolean;
             }
             return session;
         },
@@ -139,6 +143,8 @@ export const authOptions: NextAuthOptions = {
                 token.id = user.id;
                 token.role = user.role;
                 token.username = user.username;
+                token.isPM = user.isPM;
+                token.isQC = user.isQC;
             }
             return token;
         },

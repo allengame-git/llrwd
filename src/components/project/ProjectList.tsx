@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import EditProjectButton from "./EditProjectButton";
 import DeleteProjectButton from "./DeleteProjectButton";
+import CopyProjectButton from "./CopyProjectButton";
 import { formatDate } from "@/lib/date-utils";
 
 type Project = {
@@ -21,7 +22,7 @@ type Project = {
 export default function ProjectList({ projects }: { projects: Project[] }) {
     const { data: session } = useSession();
 
-    const canEdit = session?.user.role === "ADMIN" || session?.user.role === "INSPECTOR";
+    const canEdit = session?.user.role === "ADMIN" || session?.user.isPM === true;
 
     if (projects.length === 0) {
         return (
@@ -48,7 +49,10 @@ export default function ProjectList({ projects }: { projects: Project[] }) {
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             {canEdit && (
-                                <EditProjectButton project={project} />
+                                <>
+                                    <CopyProjectButton project={project} />
+                                    <EditProjectButton project={project} />
+                                </>
                             )}
                             {session?.user.role === "ADMIN" && (
                                 <DeleteProjectButton project={project} />
