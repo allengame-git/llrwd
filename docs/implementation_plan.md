@@ -1,16 +1,17 @@
 # 功能實作計畫 (implementation_plan.md)
 
-> 最後更新: 2026-01-08
+> 最後更新: 2026-01-14
 
 本文件記錄各功能的需求分析與技術設計。
 
 ## 最新更新
 
+- **Phase 18**: PDF-lib 重構與 Vercel 部署 ✅ 已完成 (2026-01-14)
+- **Phase 17**: 專案複製功能 ✅ 已完成 (2026-01-13)
+- **Phase 16**: QC/PM 複審流程 ✅ 已完成 (2026-01-13)
 - **Phase 8.1**: 首頁儀表板 Infographic 改版 ✅ 已完成 (2026-01-07)
 - **Phase 8.2**: 側邊欄導覽強化 (Accordion) ✅ 已完成 (2026-01-07)
 - **Phase 8.3**: 歷史詳情審查紀錄優化 ✅ 已完成 (2026-01-07)
-- **Phase 6.5**: Docker 部署準備 ✅ 已完成 (2026-01-05)
-- **Phase 6.4**: 全域歷史 Dashboard 優化 ✅ 已完成 (2026-01-05)
 
 ---
 
@@ -567,3 +568,129 @@ const handleDrop = (e: React.DragEvent) => {
 - **狀態管理**: Loading, Success, Error 狀態切換
 
 ### 16.3 狀態: ✅ 已完成
+
+---
+
+## 17. Phase 16: QC/PM 複審流程
+
+> Status: ✅ Done (v1.8.0)
+
+### 17.1 需求分析
+
+- **痛點**: 品質文件審核若有問題，只能全部駁回，無法要求部分修訂
+- **解法**: 新增「要求修訂」狀態，允許 QC/PM 退回要求修改後重新提交
+
+### 17.2 技術實作
+
+**Schema 擴充**:
+
+```prisma
+model QCDocumentApproval {
+  // ...existing fields
+  revisionCount Int @default(0)  // 修訂次數
+}
+```
+
+**狀態流程**:
+
+| 狀態 | 說明 |
+| :--- | :--- |
+| `PENDING_QC` | 待 QC 審核 |
+| `PENDING_PM` | 待 PM 核定 |
+| `REVISION_REQUIRED` | 需要修訂 (被退回) |
+| `COMPLETED` | 審核完成 |
+| `REJECTED` | 永久駁回 |
+
+**Server Actions**:
+
+- `requestRevision(id, note)`: QC/PM 要求修訂
+- 修訂完成後重新提交，狀態自動轉為 `PENDING_QC` 或 `PENDING_PM`
+- 每次修訂 `revisionCount++`
+
+### 17.3 狀態: ✅ 已完成
+
+---
+
+## 18. Phase 17: 專案複製功能
+
+> Status: ✅ Done (v1.8.0)
+
+### 18.1 需求分析
+
+- **目標**: 快速建立相似結構的新專案
+- **範圍**: 複製專案基本資料與項目結構
+- **選項**: 可選擇是否包含項目內容與附件
+
+### 18.2 技術實作
+
+**Server Action**: `duplicateProject(projectId, newTitle, newPrefix)`
+
+```typescript
+// 核心邏輯
+async function duplicateProject(projectId: number, title: string, prefix: string) {
+  // 1. 建立新專案
+  const newProject = await prisma.project.create({ data: { title, codePrefix: prefix } });
+  
+  // 2. 取得原專案所有項目
+  const items = await prisma.item.findMany({ where: { projectId } });
+  
+  // 3. 遞迴複製項目 (維持父子關係)
+  const idMap = new Map<number, number>();
+  for (const item of items) {
+    const newItem = await prisma.item.create({
+      data: {
+        projectId: newProject.id,
+        parentId: item.parentId ? idMap.get(item.parentId) : null,
+        fullId: generateFullId(prefix, item),
+        title: item.title,
+        content: item.content,
+        // ...
+      }
+    });
+    idMap.set(item.id, newItem.id);
+  }
+  
+  return newProject;
+}
+```
+
+### 18.3 狀態: ✅ 已完成
+
+---
+
+## 19. Phase 18: PDF-lib 重構與 Vercel 部署
+
+> Status: ✅ Done (v1.8.0)
+
+### 19.1 需求分析
+
+- **問題**: Puppeteer 套件過大 (~200MB)，不適合 Serverless 環境
+- **解法**: 移除 Puppeteer 依賴，改用 pdf-lib 純文字渲染
+
+### 19.2 技術實作
+
+**PDF 生成重構**:
+
+```typescript
+// 舊版: 使用 Puppeteer 截圖
+// const screenshot = await renderHtmlToPDF(htmlContent);
+
+// 新版: 使用 pdf-lib 純文字
+async function generateHistorySummaryPages(pdfDoc: PDFDocument, history: ItemHistory) {
+  const page = pdfDoc.addPage();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  
+  // 繪製歷史摘要 (項目編號、標題、變更類型等)
+  page.drawText(`Item: ${history.itemFullId}`, { x: 50, y: 750, font });
+  page.drawText(`Change Type: ${history.changeType}`, { x: 50, y: 730, font });
+  // ...
+}
+```
+
+**Vercel 部署調整**:
+
+1. `force-dynamic` 加入所有動態 API 路由
+2. 移除 fs 寫入操作 (Serverless 無持久化檔案系統)
+3. 使用 Neon PostgreSQL 替代本地資料庫
+
+### 19.3 狀態: ✅ 已完成

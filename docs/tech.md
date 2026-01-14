@@ -1,16 +1,17 @@
-# 技術文件 - 專案項目資訊管理系統 (tech.md)
+# 技術文件 - 低放射性廢棄物處置管理系統 (tech.md)
 
->> 最後更新: 2026-01-09
+>> 最後更新: 2026-01-14
 
 ## 專案資訊
 
 | 項目 | 說明 |
 | :--- | :--- |
-| **專案名稱** | 專案項目資訊管理系統 (RMS) |
-| **技術棧** | Next.js 14, TypeScript, Prisma, SQLite, NextAuth.js |
+| **專案名稱** | 低放射性廢棄物處置管理系統 (LLRWD-RMS) |
+| **技術棧** | Next.js 14, TypeScript, Prisma, PostgreSQL, NextAuth.js |
 | **樣式方案** | Vanilla CSS + CSS Variables |
 | **編輯器** | Tiptap (ProseMirror-based) |
-| **部署方案** | Docker + Nginx (HTTPS) |
+| **PDF 生成** | pdf-lib + @pdf-lib/fontkit (純 JS，無需 Puppeteer) |
+| **部署方案** | Docker + Nginx / Vercel + Neon PostgreSQL |
 
 ---
 

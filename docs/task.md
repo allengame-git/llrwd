@@ -1,6 +1,6 @@
-# 專案項目資訊管理系統 - 開發進度 (task.md)
+# 低放射性廢棄物處置管理系統 - 開發進度 (task.md)
 
->> 最後更新: 2026-01-12
+>> 最後更新: 2026-01-14
 
 ## 進度總覽
 
@@ -18,6 +18,9 @@
 | Phase 10 | 品質文件 PDF 優化 | ✅ 完成 |
 | Phase 11 | 變更申請退回優化 | ✅ 完成 |
 | Phase 12 | ISO 文件頁面優化 | ✅ 完成 |
+| Phase 16 | QC/PM 複審流程 | ✅ 完成 |
+| Phase 17 | 專案複製功能 | ✅ 完成 |
+| Phase 18 | PDF-lib 重構與 Vercel 部署 | ✅ 完成 |
 
 ---
 
@@ -310,3 +313,56 @@
 - [x] 進度條與狀態顯示 (Progress Bar)
 - [x] 備份檔案完整性檢查
 - [x] 復原完成後自動登出機制
+
+---
+
+## Phase 16: QC/PM 複審流程 (v1.8.0) ✅
+
+### Phase 16.1: 複審機制 ✅
+
+- [x] QCDocumentApproval 模型新增 `revisionCount` 欄位
+- [x] 新增 `REVISION_REQUIRED` 狀態 (要求修訂)
+- [x] QC/PM 可選擇「核准」或「要求修訂」
+- [x] 修訂後自動變更狀態為 `PENDING_QC` 或 `PENDING_PM`
+
+### Phase 16.2: UI 整合 ✅
+
+- [x] 審核頁面新增「要求修訂」按鈕
+- [x] 品質文件狀態顯示修訂次數
+- [x] 歷史詳情頁顯示完整複審歷程 (Timeline)
+- [x] `ReviewProcessTimeline` 元件支援 revisions 陣列
+
+---
+
+## Phase 17: 專案複製功能 (v1.8.0) ✅
+
+### Phase 17.1: 後端實作 ✅
+
+- [x] Server Action: `duplicateProject(projectId, newTitle, newPrefix)`
+- [x] 遞迴複製項目結構 (深層複製)
+- [x] 保持 fullId 自動重新計算
+- [x] 選擇性複製項目內容與附件
+
+### Phase 17.2: 前端整合 ✅
+
+- [x] 專案卡片新增「複製」按鈕
+- [x] 複製對話框 (輸入新專案名稱與編碼)
+- [x] 複製完成後自動跳轉至新專案
+
+---
+
+## Phase 18: PDF-lib 重構與 Vercel 部署 (v1.8.0) ✅
+
+### Phase 18.1: PDF 生成重構 ✅
+
+- [x] 移除 Puppeteer 依賴 (降低套件大小)
+- [x] 改用 pdf-lib 純文字渲染歷史摘要
+- [x] `generateHistorySummaryPages` 直接生成 PDF 頁面
+- [x] 維持簽名嵌入功能 (`embedSignatureInPDF`)
+
+### Phase 18.2: Vercel 部署支援 ✅
+
+- [x] 動態路由加入 `force-dynamic` 防止靜態預渲染
+- [x] 移除 API Route 中的 fs 寫入操作 (Serverless 相容)
+- [x] 建立 Neon PostgreSQL 連線指南
+- [x] 撰寫 `docs/freespace_deployment.md` 部署文件
