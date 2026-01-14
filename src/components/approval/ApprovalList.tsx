@@ -11,6 +11,15 @@ type RelatedItem = {
     description?: string | null;
 };
 
+type Reference = {
+    fileId: number;
+    dataCode: string;
+    dataName: string;
+    dataYear: number;
+    author: string;
+    citation?: string | null;
+};
+
 type Request = {
     id: number;
     type: string;
@@ -31,6 +40,10 @@ type Request = {
             description: string | null;
             target: { id: number; fullId: string; title: string };
         }>;
+        references: Array<{
+            citation: string | null;
+            file: { id: number; dataCode: string; dataName: string; dataYear: number; author: string };
+        }>;
     } | null;
 };
 
@@ -45,10 +58,29 @@ const getItemRelatedItems = (item: Request['item']): RelatedItem[] => {
     }));
 };
 
+// Helper to transform references
+const getItemReferences = (item: Request['item']): Reference[] => {
+    if (!item?.references) return [];
+    return item.references.map(r => ({
+        fileId: r.file.id,
+        dataCode: r.file.dataCode,
+        dataName: r.file.dataName,
+        dataYear: r.file.dataYear,
+        author: r.file.author,
+        citation: r.citation
+    }));
+};
+
 const getComparableRelated = (items: RelatedItem[]) => {
     return items
         .map(r => ({ id: r.id, desc: r.description || '' }))
         .sort((a: { id: number }, b: { id: number }) => a.id - b.id);
+};
+
+const getComparableReferences = (refs: Reference[]) => {
+    return refs
+        .map(r => ({ fileId: r.fileId, citation: r.citation || '' }))
+        .sort((a, b) => a.fileId - b.fileId);
 };
 
 export default function ApprovalList({ requests, currentUsername, currentUserRole }: { requests: Request[]; currentUsername: string; currentUserRole: string }) {
@@ -344,6 +376,9 @@ export default function ApprovalList({ requests, currentUsername, currentUserRol
                                         const currentRelated = getComparableRelated(getItemRelatedItems(req.item));
                                         const proposedRelated = getComparableRelated(data.relatedItems || []);
                                         if (JSON.stringify(currentRelated) !== JSON.stringify(proposedRelated)) modified.push("關聯項目");
+                                        const currentRefs = getComparableReferences(getItemReferences(req.item));
+                                        const proposedRefs = getComparableReferences(data.references || []);
+                                        if (JSON.stringify(currentRefs) !== JSON.stringify(proposedRefs)) modified.push("參考文獻");
                                         return modified.length > 0 ? modified.join("、") : "無變更";
                                     })()}
                                 </div>
@@ -402,15 +437,23 @@ export default function ApprovalList({ requests, currentUsername, currentUserRol
                                         minWidth: "200px",
                                         padding: "0.75rem",
                                         backgroundColor: req.type === "UPDATE" && req.item?.title !== data.title
-                                            ? "rgba(34, 197, 94, 0.1)"
+                                            ? "rgba(34, 197, 94, 0.15)"
                                             : "rgba(0,0,0,0.03)",
                                         borderRadius: "var(--radius-sm)",
                                         border: req.type === "UPDATE" && req.item?.title !== data.title
-                                            ? "1px solid var(--color-success)"
-                                            : "1px solid var(--color-border)"
+                                            ? "2px solid var(--color-success)"
+                                            : "1px solid var(--color-border)",
+                                        borderLeft: req.type === "UPDATE" && req.item?.title !== data.title
+                                            ? "6px solid var(--color-success)"
+                                            : undefined
                                     }}>
-                                        <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.25rem" }}>
-                                            {req.type === "UPDATE" ? "修改後" : "值"}
+                                        <div style={{
+                                            fontSize: "0.75rem",
+                                            color: req.type === "UPDATE" && req.item?.title !== data.title ? "var(--color-success)" : "var(--color-text-muted)",
+                                            marginBottom: "0.25rem",
+                                            fontWeight: req.type === "UPDATE" && req.item?.title !== data.title ? 700 : 400
+                                        }}>
+                                            {req.type === "UPDATE" ? "修改後" : "值"} {req.type === "UPDATE" && req.item?.title !== data.title && "✨ 變更"}
                                         </div>
                                         <strong>{data.title}</strong>
                                     </div>
@@ -446,17 +489,26 @@ export default function ApprovalList({ requests, currentUsername, currentUserRol
                                             minWidth: "200px",
                                             padding: "1rem",
                                             backgroundColor: req.type === "UPDATE" && req.item?.content !== data.content
-                                                ? "rgba(34, 197, 94, 0.05)"
+                                                ? "rgba(34, 197, 94, 0.12)"
                                                 : "var(--color-bg-base)",
                                             borderRadius: "var(--radius-md)",
                                             border: req.type === "UPDATE" && req.item?.content !== data.content
-                                                ? "1px solid var(--color-success)"
+                                                ? "2px solid var(--color-success)"
                                                 : "1px solid var(--color-border)",
+                                            borderLeft: req.type === "UPDATE" && req.item?.content !== data.content
+                                                ? "6px solid var(--color-success)"
+                                                : undefined,
                                             maxHeight: "300px",
-                                            overflowY: "auto"
+                                            overflowY: "auto",
+                                            position: "relative"
                                         }}>
-                                            <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem" }}>
-                                                {req.type === "UPDATE" ? "修改後" : "值"}
+                                            <div style={{
+                                                fontSize: "0.75rem",
+                                                color: req.type === "UPDATE" && req.item?.content !== data.content ? "var(--color-success)" : "var(--color-text-muted)",
+                                                marginBottom: "0.5rem",
+                                                fontWeight: req.type === "UPDATE" && req.item?.content !== data.content ? 700 : 400
+                                            }}>
+                                                {req.type === "UPDATE" ? "修改後" : "值"} {req.type === "UPDATE" && req.item?.content !== data.content && "✨ 變更"}
                                             </div>
                                             <div dangerouslySetInnerHTML={{ __html: data.content || "<em>無內容</em>" }} />
                                         </div>
@@ -539,18 +591,45 @@ export default function ApprovalList({ requests, currentUsername, currentUserRol
                                                 if (req.type !== "UPDATE") return "rgba(0,0,0,0.03)";
                                                 const currIds = getComparableRelated(getItemRelatedItems(req.item));
                                                 const propIds = getComparableRelated(data.relatedItems || []);
-                                                return JSON.stringify(currIds) !== JSON.stringify(propIds) ? "rgba(34, 197, 94, 0.1)" : "rgba(0,0,0,0.03)";
+                                                return JSON.stringify(currIds) !== JSON.stringify(propIds) ? "rgba(34, 197, 94, 0.15)" : "rgba(0,0,0,0.03)";
                                             })(),
                                             borderRadius: "var(--radius-sm)",
                                             border: (() => {
                                                 if (req.type !== "UPDATE") return "1px solid var(--color-border)";
                                                 const currIds = getComparableRelated(getItemRelatedItems(req.item));
                                                 const propIds = getComparableRelated(data.relatedItems || []);
-                                                return JSON.stringify(currIds) !== JSON.stringify(propIds) ? "1px solid var(--color-success)" : "1px solid var(--color-border)";
+                                                return JSON.stringify(currIds) !== JSON.stringify(propIds) ? "2px solid var(--color-success)" : "1px solid var(--color-border)";
+                                            })(),
+                                            borderLeft: (() => {
+                                                if (req.type !== "UPDATE") return undefined;
+                                                const currIds = getComparableRelated(getItemRelatedItems(req.item));
+                                                const propIds = getComparableRelated(data.relatedItems || []);
+                                                return JSON.stringify(currIds) !== JSON.stringify(propIds) ? "6px solid var(--color-success)" : undefined;
                                             })()
                                         }}>
-                                            <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem" }}>
+                                            <div style={{
+                                                fontSize: "0.75rem",
+                                                color: (() => {
+                                                    if (req.type !== "UPDATE") return "var(--color-text-muted)";
+                                                    const currIds = getComparableRelated(getItemRelatedItems(req.item));
+                                                    const propIds = getComparableRelated(data.relatedItems || []);
+                                                    return JSON.stringify(currIds) !== JSON.stringify(propIds) ? "var(--color-success)" : "var(--color-text-muted)";
+                                                })(),
+                                                marginBottom: "0.5rem",
+                                                fontWeight: (() => {
+                                                    if (req.type !== "UPDATE") return 400;
+                                                    const currIds = getComparableRelated(getItemRelatedItems(req.item));
+                                                    const propIds = getComparableRelated(data.relatedItems || []);
+                                                    return JSON.stringify(currIds) !== JSON.stringify(propIds) ? 700 : 400;
+                                                })()
+                                            }}>
                                                 {req.type === "UPDATE" ? `修改後 (${(data.relatedItems || []).length})` : `數量：${(data.relatedItems || []).length}`}
+                                                {(() => {
+                                                    if (req.type !== "UPDATE") return null;
+                                                    const currIds = getComparableRelated(getItemRelatedItems(req.item));
+                                                    const propIds = getComparableRelated(data.relatedItems || []);
+                                                    return JSON.stringify(currIds) !== JSON.stringify(propIds) ? " ✨ 變更" : null;
+                                                })()}
                                             </div>
                                             {(data.relatedItems || []).length > 0 ? (
                                                 (data.relatedItems || []).map((ri: RelatedItem) => (
@@ -567,6 +646,118 @@ export default function ApprovalList({ requests, currentUsername, currentUserRol
                                                 ))
                                             ) : (
                                                 <em style={{ color: "var(--color-text-muted)" }}>無關聯項目</em>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* References Section */}
+                            {((data.references?.length ?? 0) > 0 || (req.type === "UPDATE" && getItemReferences(req.item).length > 0)) && (
+                                <div style={{ marginBottom: "1.5rem" }}>
+                                    <strong style={{ display: "block", marginBottom: "0.5rem" }}>
+                                        參考文獻 {req.type === "UPDATE" && (() => {
+                                            const currRefs = getComparableReferences(getItemReferences(req.item));
+                                            const propRefs = getComparableReferences(data.references || []);
+                                            return JSON.stringify(currRefs) !== JSON.stringify(propRefs);
+                                        })() && (
+                                                <span style={{ color: "var(--color-warning)", fontSize: "0.85rem" }}>• 已修改</span>
+                                            )}
+                                    </strong>
+                                    <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                                        {req.type === "UPDATE" && getItemReferences(req.item).length > 0 && (
+                                            <div style={{
+                                                flex: 1,
+                                                minWidth: "200px",
+                                                padding: "0.75rem",
+                                                backgroundColor: "rgba(0,0,0,0.03)",
+                                                borderRadius: "var(--radius-sm)",
+                                                border: "1px solid var(--color-border)"
+                                            }}>
+                                                <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem" }}>修改前 ({getItemReferences(req.item).length})</div>
+                                                {getItemReferences(req.item).map((ref: Reference) => (
+                                                    <div key={ref.fileId} style={{ fontSize: "0.9rem", marginBottom: "0.5rem" }}>
+                                                        <div>
+                                                            <div style={{ fontWeight: "bold" }}>{ref.dataName} ({ref.dataYear})</div>
+                                                            <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted)", marginTop: "0.1rem" }}>
+                                                                作者: {ref.author}
+                                                            </div>
+                                                        </div>
+                                                        {ref.citation && (
+                                                            <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted)", marginTop: "0.25rem", paddingLeft: "0.5rem", borderLeft: "2px solid var(--color-border)" }}>
+                                                                {ref.citation}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div style={{
+                                            flex: 1,
+                                            minWidth: "200px",
+                                            padding: "0.75rem",
+                                            backgroundColor: (() => {
+                                                if (req.type !== "UPDATE") return "rgba(0,0,0,0.03)";
+                                                const currRefs = getComparableReferences(getItemReferences(req.item));
+                                                const propRefs = getComparableReferences(data.references || []);
+                                                return JSON.stringify(currRefs) !== JSON.stringify(propRefs) ? "rgba(34, 197, 94, 0.15)" : "rgba(0,0,0,0.03)";
+                                            })(),
+                                            borderRadius: "var(--radius-sm)",
+                                            border: (() => {
+                                                if (req.type !== "UPDATE") return "1px solid var(--color-border)";
+                                                const currRefs = getComparableReferences(getItemReferences(req.item));
+                                                const propRefs = getComparableReferences(data.references || []);
+                                                return JSON.stringify(currRefs) !== JSON.stringify(propRefs) ? "2px solid var(--color-success)" : "1px solid var(--color-border)";
+                                            })(),
+                                            borderLeft: (() => {
+                                                if (req.type !== "UPDATE") return undefined;
+                                                const currRefs = getComparableReferences(getItemReferences(req.item));
+                                                const propRefs = getComparableReferences(data.references || []);
+                                                return JSON.stringify(currRefs) !== JSON.stringify(propRefs) ? "6px solid var(--color-success)" : undefined;
+                                            })()
+                                        }}>
+                                            <div style={{
+                                                fontSize: "0.75rem",
+                                                color: (() => {
+                                                    if (req.type !== "UPDATE") return "var(--color-text-muted)";
+                                                    const currRefs = getComparableReferences(getItemReferences(req.item));
+                                                    const propRefs = getComparableReferences(data.references || []);
+                                                    return JSON.stringify(currRefs) !== JSON.stringify(propRefs) ? "var(--color-success)" : "var(--color-text-muted)";
+                                                })(),
+                                                marginBottom: "0.5rem",
+                                                fontWeight: (() => {
+                                                    if (req.type !== "UPDATE") return 400;
+                                                    const currRefs = getComparableReferences(getItemReferences(req.item));
+                                                    const propRefs = getComparableReferences(data.references || []);
+                                                    return JSON.stringify(currRefs) !== JSON.stringify(propRefs) ? 700 : 400;
+                                                })()
+                                            }}>
+                                                {req.type === "UPDATE" ? `修改後 (${(data.references || []).length})` : `數量：${(data.references || []).length}`}
+                                                {(() => {
+                                                    if (req.type !== "UPDATE") return null;
+                                                    const currRefs = getComparableReferences(getItemReferences(req.item));
+                                                    const propRefs = getComparableReferences(data.references || []);
+                                                    return JSON.stringify(currRefs) !== JSON.stringify(propRefs) ? " ✨ 變更" : null;
+                                                })()}
+                                            </div>
+                                            {(data.references || []).length > 0 ? (
+                                                (data.references || []).map((ref: Reference) => (
+                                                    <div key={ref.fileId} style={{ fontSize: "0.9rem", marginBottom: "0.5rem" }}>
+                                                        <div>
+                                                            <div style={{ fontWeight: "bold" }}>{ref.dataName} ({ref.dataYear})</div>
+                                                            <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted)", marginTop: "0.1rem" }}>
+                                                                作者: {ref.author}
+                                                            </div>
+                                                        </div>
+                                                        {ref.citation && (
+                                                            <div style={{ fontSize: "0.8rem", color: "var(--color-text-muted)", marginTop: "0.25rem", paddingLeft: "0.5rem", borderLeft: "2px solid var(--color-border)" }}>
+                                                                {ref.citation}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <em style={{ color: "var(--color-text-muted)" }}>無參考文獻</em>
                                             )}
                                         </div>
                                     </div>

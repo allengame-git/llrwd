@@ -35,13 +35,15 @@ export async function submitCreateItemRequest(
 
     const relatedItemsStr = formData.get("relatedItems") as string;
     const relatedItems = relatedItemsStr ? JSON.parse(relatedItemsStr) : [];
+    const referencesStr = formData.get("references") as string;
+    const references = referencesStr ? JSON.parse(referencesStr) : [];
 
     if (!title || !projectId) {
         return { error: "Missing required fields" };
     }
 
     const submitReason = formData.get("submitReason") as string || null;
-    const data = JSON.stringify({ title, content, attachments, relatedItems });
+    const data = JSON.stringify({ title, content, attachments, relatedItems, references });
 
     try {
         await prisma.changeRequest.create({
@@ -81,6 +83,8 @@ export async function submitUpdateItemRequest(
     const attachments = attachmentsStr ? JSON.parse(attachmentsStr) : null;
     const relatedItemsStr = formData.get("relatedItems") as string;
     const relatedItems = relatedItemsStr ? JSON.parse(relatedItemsStr) : null;
+    const referencesStr = formData.get("references") as string;
+    const references = referencesStr ? JSON.parse(referencesStr) : null;
 
     if (!itemId || !title) {
         return { error: "Missing required fields" };
@@ -90,7 +94,7 @@ export async function submitUpdateItemRequest(
     const item = await prisma.item.findUnique({ where: { id: itemId } });
     if (!item) return { error: "Item not found" };
 
-    const data = JSON.stringify({ title, content, attachments, relatedItems });
+    const data = JSON.stringify({ title, content, attachments, relatedItems, references });
     const submitReason = formData.get("submitReason") as string || null;
     const rawPreviousRequestId = formData.get("previousRequestId");
     const previousRequestId = (rawPreviousRequestId && rawPreviousRequestId !== "") ? parseInt(rawPreviousRequestId as string) : null;
@@ -269,6 +273,13 @@ export async function getPendingRequests() {
                                 select: { id: true, fullId: true, title: true }
                             }
                         }
+                    },
+                    references: {
+                        include: {
+                            file: {
+                                select: { id: true, dataCode: true, dataName: true, dataYear: true, author: true }
+                            }
+                        }
                     }
                 }
             }
@@ -343,16 +354,36 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
                 }
             }
 
+            // Handle references via ItemReference table
+            if (data.references && data.references.length > 0) {
+                for (const ref of data.references) {
+                    try {
+                        await prisma.itemReference.create({
+                            data: {
+                                itemId: newItem.id,
+                                fileId: ref.fileId,
+                                citation: ref.citation || null
+                            }
+                        });
+                    } catch (e) { /* ignore duplicate */ }
+                }
+            }
+
             // HISTORY RECORD
             const relationsForSnapshot = await prisma.itemRelation.findMany({
                 where: { sourceId: newItem.id },
                 include: { target: { select: { id: true, fullId: true, title: true } } }
             });
+            const referencesForSnapshot = await prisma.itemReference.findMany({
+                where: { itemId: newItem.id },
+                include: { file: { select: { id: true, dataCode: true, dataName: true, dataYear: true, author: true } } }
+            });
             const snapshot: ItemSnapshot = {
                 title: newItem.title,
                 content: newItem.content,
                 attachments: newItem.attachments,
-                relatedItems: relationsForSnapshot.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
+                relatedItems: relationsForSnapshot.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description })),
+                references: referencesForSnapshot.map(r => ({ fileId: r.file.id, dataCode: r.file.dataCode, dataName: r.file.dataName, dataYear: r.file.dataYear, author: r.file.author, citation: r.citation }))
             };
 
             await createHistoryRecord(newItem, snapshot, { id: request.id, submittedById: request.submittedById, submitReason: request.submitReason, reviewNote: reviewNote, createdAt: request.createdAt }, "CREATE", session.user.id);
@@ -365,6 +396,10 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
                 where: { sourceId: request.itemId },
                 include: { target: { select: { id: true, fullId: true, title: true } } }
             });
+            const originalReferences = await prisma.itemReference.findMany({
+                where: { itemId: request.itemId },
+                include: { file: { select: { id: true, dataCode: true, dataName: true, dataYear: true, author: true } } }
+            });
             const originalItem = await prisma.item.findUnique({
                 where: { id: request.itemId }
             });
@@ -374,7 +409,8 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
                 title: originalItem.title,
                 content: originalItem.content,
                 attachments: originalItem.attachments,
-                relatedItems: originalRelations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
+                relatedItems: originalRelations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description })),
+                references: originalReferences.map(r => ({ fileId: r.file.id, dataCode: r.file.dataCode, dataName: r.file.dataName, dataYear: r.file.dataYear, author: r.file.author, citation: r.citation }))
             };
 
             await prisma.item.update({
@@ -414,10 +450,35 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
                 }
             }
 
+            // Handle references via ItemReference table if provided
+            if (data.references) {
+                // Delete existing references
+                await prisma.itemReference.deleteMany({
+                    where: { itemId: request.itemId }
+                });
+
+                // Create new references
+                for (const ref of data.references) {
+                    try {
+                        await prisma.itemReference.create({
+                            data: {
+                                itemId: request.itemId,
+                                fileId: ref.fileId,
+                                citation: ref.citation || null
+                            }
+                        });
+                    } catch (e) { /* ignore duplicate */ }
+                }
+            }
+
             // Get Updated Relations
             const updatedRelations = await prisma.itemRelation.findMany({
                 where: { sourceId: request.itemId },
                 include: { target: { select: { id: true, fullId: true, title: true } } }
+            });
+            const updatedReferences = await prisma.itemReference.findMany({
+                where: { itemId: request.itemId },
+                include: { file: { select: { id: true, dataCode: true, dataName: true, dataYear: true, author: true } } }
             });
             const updatedItem = await prisma.item.findUnique({
                 where: { id: request.itemId }
@@ -427,7 +488,8 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
                     title: updatedItem.title,
                     content: updatedItem.content,
                     attachments: updatedItem.attachments,
-                    relatedItems: updatedRelations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
+                    relatedItems: updatedRelations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description })),
+                    references: updatedReferences.map(r => ({ fileId: r.file.id, dataCode: r.file.dataCode, dataName: r.file.dataName, dataYear: r.file.dataYear, author: r.file.author, citation: r.citation }))
                 };
 
                 await createHistoryRecord(updatedItem, newSnapshot, { id: request.id, submittedById: request.submittedById, submitReason: request.submitReason, reviewNote: reviewNote, createdAt: request.createdAt }, "UPDATE", session.user.id, oldSnapshot);
@@ -450,12 +512,17 @@ export async function approveRequest(requestId: number, reviewNote?: string) {
                 where: { sourceId: request.itemId },
                 include: { target: { select: { id: true, fullId: true, title: true } } }
             });
+            const itemReferences = await prisma.itemReference.findMany({
+                where: { itemId: request.itemId },
+                include: { file: { select: { id: true, dataCode: true, dataName: true, dataYear: true, author: true } } }
+            });
 
             const lastSnapshot: ItemSnapshot = {
                 title: item.title,
                 content: item.content,
                 attachments: item.attachments,
-                relatedItems: relations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description }))
+                relatedItems: relations.map(r => ({ id: r.target.id, fullId: r.target.fullId, title: r.target.title, description: r.description })),
+                references: itemReferences.map(r => ({ fileId: r.file.id, dataCode: r.file.dataCode, dataName: r.file.dataName, dataYear: r.file.dataYear, author: r.file.author, citation: r.citation }))
             };
 
             // Delete relations first

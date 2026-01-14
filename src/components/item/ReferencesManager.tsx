@@ -427,7 +427,7 @@ export default function ReferencesManager({
                                                 </span>
                                             </div>
                                             <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                                                作者：{file.author} | {file.dataCode}
+                                                作者：{file.author}
                                             </div>
                                         </div>
                                         {isAdded ? (
