@@ -21,6 +21,7 @@
 | Phase 16 | QC/PM 複審流程 | ✅ 完成 |
 | Phase 17 | 專案複製功能 | ✅ 完成 |
 | Phase 18 | PDF-lib 重構與 Vercel 部署 | ✅ 完成 |
+| Phase 19 | 富文本編輯器強化 (巢狀編號、縮排) | ✅ 完成 |
 
 ---
 
@@ -366,3 +367,25 @@
 - [x] 移除 API Route 中的 fs 寫入操作 (Serverless 相容)
 - [x] 建立 Neon PostgreSQL 連線指南
 - [x] 撰寫 `docs/freespace_deployment.md` 部署文件
+
+---
+
+## Phase 19: 富文本編輯器強化 (v1.9.0) ✅
+
+### Phase 19.1: 巢狀編號與列表 ✅
+
+- [x] 實作有序列表 (ol) 的巢狀編號功能 (1., 1.1, 1.2.1)
+- [x] 使用 CSS Counters 實現動態編號渲染
+- [x] 修復編號版面跑位 (跨行顯示問題)
+
+### Phase 19.2: 段落縮排與對齊 ✅
+
+- [x] 實作自定義 `Indent` Tiptap 擴充套件
+- [x] 整合 Tab (增加縮排) 與 Shift+Tab (減少縮排) 快捷鍵
+- [x] 優化縮排邏輯：列表項目使用 `sinkListItem`/`liftListItem`，一般段落使用 `margin-left`
+
+### Phase 19.3: 全域樣式整合 ✅
+
+- [x] 提取富文本樣式至 `globals.css` 中的 `.rich-text-content`
+- [x] 確保「項目詳情」、「審核清單」、「歷史版本」、「退回申請」樣式一致
+- [x] 整合 `TextAlign` 擴充套件並配置文字對齊樣式

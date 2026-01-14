@@ -796,6 +796,58 @@ src/
 - **生成方式**: 後端非同步生成 PDF，不阻塞主要流程 (但需確保生成成功後更新 DB)
 - **儲存策略**: 產生靜態檔案至 `/public/iso_doc/`，資料庫儲存相對路徑
 
+---
+
+## Phase 19: 富文本編輯器強化 (v1.9.0)
+
+### 19.1 巢狀編號實作 (CSS Counters)
+
+為了讓有序列表 (`ol`) 顯示如 `1.1`, `1.2.1` 的巢狀格式，我們使用了 CSS Counters 屬性：
+
+- `counter-reset: item`: 在 `ol` 重置計數。
+- `counter-increment: item`: 在每個 `li` 遞增計數。
+- `content: counters(item, ".") ". "`: 在 `::before` 偽元素中遞迴顯示計數器。
+
+**樣式定義 (globals.css)**:
+
+```css
+.rich-text-content ol {
+  list-style-type: none;
+  counter-reset: item;
+  padding-left: 2.5rem;
+}
+.rich-text-content ol > li::before {
+  content: counters(item, ".") ". ";
+  position: absolute;
+  left: -3rem;
+  width: 2.8rem;
+  text-align: right;
+  white-space: nowrap;
+}
+```
+
+### 19.2 自定義 Indent 擴充套件
+
+為了支援段落縮排與對齊，我們實作了 `src/components/editor/extensions/Indent.ts`：
+
+- **屬性**: `margin-left` 儲存於 `indent` Attribute。
+- **快捷鍵**:
+  - `Tab`: 呼叫 `indent` 指令。
+  - `Shift+Tab`: 呼叫 `outdent` 指令。
+- **列表處理**: 當游標在列表項目 (`listItem`) 內時，會優先執行 Tiptap 內建的 `sinkListItem`/`liftListItem` 以保持結構正確。
+
+### 19.3 全域富文本樣式 (.rich-text-content)
+
+為解決樣式不一致問題，所有富文本渲染區塊皆統一使用 `.rich-text-content` 類別，並定義於 `app/globals.css`。
+
+**包含樣式**:
+
+- 表格寬度與邊框。
+- 圖片圓角與最大寬度。
+- 區塊引言 (blockquote)。
+- 列表與巢狀編號。
+- 段落文字對齊 (TextAlign 支援)。
+
 ### 13. S.O.P. & Structure
 
 1. **Wait for Approval**: 監聽 DB 變更或 Polling 與 Action 回傳 (目前採用 Action 回傳即時生成)

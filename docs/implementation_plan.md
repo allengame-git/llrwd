@@ -6,6 +6,7 @@
 
 ## 最新更新
 
+- **Phase 19**: 富文本編輯器強化 (巢狀編號、縮排) ✅ 已完成 (2026-01-14)
 - **Phase 18**: PDF-lib 重構與 Vercel 部署 ✅ 已完成 (2026-01-14)
 - **Phase 17**: 專案複製功能 ✅ 已完成 (2026-01-13)
 - **Phase 16**: QC/PM 複審流程 ✅ 已完成 (2026-01-13)
@@ -24,6 +25,7 @@
 5. [項目編輯刪除流程](#5-項目編輯刪除流程-item-editdelete)
 6. [Rich Text Editor 圖片功能](#6-rich-text-editor-圖片功能)
 7. [Approval Dashboard 優化](#7-approval-dashboard-優化)
+8. [富文本編輯器強化 (Phase 19)](#8-富文本編輯器強化-phase-19)
 
 ---
 
@@ -693,4 +695,29 @@ async function generateHistorySummaryPages(pdfDoc: PDFDocument, history: ItemHis
 2. 移除 fs 寫入操作 (Serverless 無持久化檔案系統)
 3. 使用 Neon PostgreSQL 替代本地資料庫
 
-### 19.3 狀態: ✅ 已完成
+---
+
+## 8. 富文本編輯器強化 (Phase 19)
+
+### 需求
+
+- 支援有序列表的巢狀編號 (如 1.1, 1.2.1)。
+- 支援段落與列表的增加/減少縮排。
+- 支援文字對齊 (左、中、右)。
+- 確保所有渲染富文本的頁面樣式一致。
+
+### 技術方案
+
+| 功能 | 實作方式 |
+|------|----------|
+| 巢狀編號 | CSS Counters (`counter-reset`, `counter-increment`, `counters()`) |
+| 縮排功能 | 自定義 `Indent` Tiptap Extension，透過 `margin-left` inline style 儲存 |
+| 快捷鍵 | 整合 `Tab` / `Shift+Tab` 觸發縮排/凸排 |
+| 文字對齊 | 整合 `@tiptap/extension-text-align` |
+| 樣式一致性 | 定義全域 `.rich-text-content` class，並套用於所有渲染區塊 |
+
+### 列表縮排邏輯
+
+為了維持 HTML 結構的語意化，當在列表項目中增加縮排時，使用的是 Tiptap 核心的 `sinkListItem` 指令（建立巢狀 `ol`/`ul`）；在一般段落時則使用 CSS `margin-left`。
+
+### 狀態: ✅ 已完成

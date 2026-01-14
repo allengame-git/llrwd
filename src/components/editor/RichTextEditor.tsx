@@ -2,14 +2,16 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image';
+import ImageResize from 'tiptap-extension-resize-image';
 import Link from '@tiptap/extension-link';
+import TextAlign from '@tiptap/extension-text-align';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { useState, useRef, useEffect } from 'react';
 import { ItemLink } from './extensions/ItemLink';
+import { Indent } from './extensions/Indent';
 
 // Helper function to upload a file to the server
 const uploadFile = async (file: File): Promise<string | null> => {
@@ -474,7 +476,12 @@ const MenuBar = ({ editor, onUploadImage }: { editor: any; onUploadImage: (file:
         try {
             const uploadedUrl = await uploadFile(file);
             if (uploadedUrl) {
-                editor.chain().focus().setImage({ src: uploadedUrl }).run();
+                // Use setTimeout to ensure editor regains focus after file dialog closes
+                setTimeout(() => {
+                    if (editor) {
+                        editor.chain().focus().setImage({ src: uploadedUrl }).run();
+                    }
+                }, 100);
             } else {
                 alert('上傳失敗');
             }
@@ -523,10 +530,83 @@ const MenuBar = ({ editor, onUploadImage }: { editor: any; onUploadImage: (file:
 
                 <div style={{ width: '1px', background: 'var(--color-border)', margin: '0 0.5rem', height: '20px' }}></div>
 
+                {/* List buttons */}
+                <button
+                    onClick={() => editor.chain().focus().toggleBulletList().run()}
+                    className={editor.isActive('bulletList') ? 'is-active' : ''}
+                    type="button"
+                    title="項目符號"
+                >
+                    • 列表
+                </button>
+                <button
+                    onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                    className={editor.isActive('orderedList') ? 'is-active' : ''}
+                    type="button"
+                    title="編號列表"
+                >
+                    1. 編號
+                </button>
+                <button
+                    onClick={() => {
+                        if (editor.isActive('listItem')) {
+                            editor.chain().focus().sinkListItem('listItem').run();
+                        } else {
+                            editor.chain().focus().indent().run();
+                        }
+                    }}
+                    type="button"
+                    title="增加縮排 (Tab)"
+                >
+                    ⇥ 縮排
+                </button>
+                <button
+                    onClick={() => {
+                        if (editor.isActive('listItem')) {
+                            editor.chain().focus().liftListItem('listItem').run();
+                        } else {
+                            editor.chain().focus().outdent().run();
+                        }
+                    }}
+                    type="button"
+                    title="減少縮排 (Shift+Tab)"
+                >
+                    ⇤ 凸排
+                </button>
+
+                <div style={{ width: '1px', background: 'var(--color-border)', margin: '0 0.5rem', height: '20px' }}></div>
+
+                {/* Text alignment buttons */}
+                <button
+                    onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                    className={editor.isActive({ textAlign: 'left' }) ? 'is-active' : ''}
+                    type="button"
+                    title="靠左對齊"
+                >
+                    ⬅
+                </button>
+                <button
+                    onClick={() => editor.chain().focus().setTextAlign('center').run()}
+                    className={editor.isActive({ textAlign: 'center' }) ? 'is-active' : ''}
+                    type="button"
+                    title="置中對齊"
+                >
+                    ⬌
+                </button>
+                <button
+                    onClick={() => editor.chain().focus().setTextAlign('right').run()}
+                    className={editor.isActive({ textAlign: 'right' }) ? 'is-active' : ''}
+                    type="button"
+                    title="靠右對齊"
+                >
+                    ➡
+                </button>
+
+                <div style={{ width: '1px', background: 'var(--color-border)', margin: '0 0.5rem', height: '20px' }}></div>
+
                 <button onClick={openLinkDialog} className={editor.isActive('link') ? 'is-active' : ''} type="button">
                     Link
                 </button>
-                <button onClick={openImageDialog} type="button">Image URL</button>
                 <button
                     onClick={handleUploadClick}
                     type="button"
@@ -614,13 +694,17 @@ interface RichTextEditorProps {
 
 const RichTextEditor = ({ content, onChange, editable = true }: RichTextEditorProps) => {
     const [isUploading, setIsUploading] = useState(false);
+    const editorRef = useRef<any>(null);
 
     const editor = useEditor({
         extensions: [
             StarterKit,
-            Image,
+            ImageResize,
             Link.configure({
                 openOnClick: true,
+            }),
+            TextAlign.configure({
+                types: ['heading', 'paragraph'],
             }),
             Table.configure({
                 resizable: true,
@@ -629,6 +713,7 @@ const RichTextEditor = ({ content, onChange, editable = true }: RichTextEditorPr
             TableHeader,
             TableCell,
             ItemLink,
+            Indent,
         ],
         content: content,
         editable: editable,
@@ -638,11 +723,11 @@ const RichTextEditor = ({ content, onChange, editable = true }: RichTextEditorPr
         },
         editorProps: {
             attributes: {
-                class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl focus:outline-none',
+                class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl focus:outline-none rich-text-content',
                 style: 'padding: 1rem; min-height: 150px;'
             },
             // Handle paste events for images - direct upload
-            handlePaste: (view, event, slice) => {
+            handlePaste: (view, event) => {
                 const items = event.clipboardData?.items;
                 if (!items) return false;
 
@@ -652,13 +737,10 @@ const RichTextEditor = ({ content, onChange, editable = true }: RichTextEditorPr
                         event.preventDefault();
                         const file = item.getAsFile();
                         if (file) {
-                            // Direct upload without editing
+                            // Upload and use editor ref to insert
                             uploadFile(file).then((uploadedUrl) => {
-                                if (uploadedUrl && view.state) {
-                                    const { state, dispatch } = view;
-                                    const node = state.schema.nodes.image.create({ src: uploadedUrl });
-                                    const transaction = state.tr.replaceSelectionWith(node);
-                                    dispatch(transaction);
+                                if (uploadedUrl && editorRef.current) {
+                                    editorRef.current.chain().focus().setImage({ src: uploadedUrl }).run();
                                 }
                             });
                         }
@@ -677,13 +759,10 @@ const RichTextEditor = ({ content, onChange, editable = true }: RichTextEditorPr
                 const file = files[0];
                 if (file.type.startsWith('image/')) {
                     event.preventDefault();
-                    // Direct upload without editing
+                    // Upload and use editor ref to insert
                     uploadFile(file).then((uploadedUrl) => {
-                        if (uploadedUrl && view.state) {
-                            const { state, dispatch } = view;
-                            const node = state.schema.nodes.image.create({ src: uploadedUrl });
-                            const transaction = state.tr.replaceSelectionWith(node);
-                            dispatch(transaction);
+                        if (uploadedUrl && editorRef.current) {
+                            editorRef.current.chain().focus().setImage({ src: uploadedUrl }).run();
                         }
                     });
                     return true;
@@ -692,6 +771,11 @@ const RichTextEditor = ({ content, onChange, editable = true }: RichTextEditorPr
             }
         }
     });
+
+    // Sync editor to ref for use in event handlers
+    useEffect(() => {
+        editorRef.current = editor;
+    }, [editor]);
 
     const handleUploadImage = async (file: File) => {
         if (!editor) return;
@@ -710,7 +794,9 @@ const RichTextEditor = ({ content, onChange, editable = true }: RichTextEditorPr
     return (
         <div className="rich-text-editor" style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
             {editable && <MenuBar editor={editor} onUploadImage={handleUploadImage} />}
-            <EditorContent editor={editor} />
+            <div className="rich-text-content">
+                <EditorContent editor={editor} />
+            </div>
 
             {/* Basic output styles for tables and images within the editor content */}
             <style global jsx>{`
@@ -748,6 +834,31 @@ const RichTextEditor = ({ content, onChange, editable = true }: RichTextEditorPr
             padding-left: 1rem;
             margin-left: 0;
             font-style: italic;
+        }
+        /* Image resize styles */
+        .ProseMirror img {
+            cursor: pointer;
+        }
+        .ProseMirror img.ProseMirror-selectednode {
+            outline: 3px solid var(--color-primary, #3b82f6);
+            outline-offset: 2px;
+        }
+        .ProseMirror .image-resizer {
+            display: inline-flex;
+            position: relative;
+            flex-grow: 0;
+        }
+        .ProseMirror .image-resizer .resize-trigger {
+            position: absolute;
+            right: -6px;
+            bottom: -6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            color: var(--color-primary, #3b82f6);
+            cursor: nwse-resize;
+        }
+        .ProseMirror .image-resizer:hover .resize-trigger {
+            opacity: 1;
         }
       `}</style>
         </div>

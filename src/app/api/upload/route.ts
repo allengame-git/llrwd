@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
 
-        if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'EDITOR')) {
+        // Allow ADMIN, EDITOR, and INSPECTOR to upload files
+        if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'EDITOR' && session.user.role !== 'INSPECTOR')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 

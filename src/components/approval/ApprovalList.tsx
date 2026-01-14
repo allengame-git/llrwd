@@ -481,7 +481,7 @@ export default function ApprovalList({ requests, currentUsername, currentUserRol
                                                 overflowY: "auto"
                                             }}>
                                                 <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem" }}>修改前</div>
-                                                <div dangerouslySetInnerHTML={{ __html: req.item.content || "<em>無內容</em>" }} />
+                                                <div className="rich-text-content" dangerouslySetInnerHTML={{ __html: req.item.content || "<em>無內容</em>" }} />
                                             </div>
                                         )}
                                         <div style={{
@@ -510,7 +510,7 @@ export default function ApprovalList({ requests, currentUsername, currentUserRol
                                             }}>
                                                 {req.type === "UPDATE" ? "修改後" : "值"} {req.type === "UPDATE" && req.item?.content !== data.content && "✨ 變更"}
                                             </div>
-                                            <div dangerouslySetInnerHTML={{ __html: data.content || "<em>無內容</em>" }} />
+                                            <div className="rich-text-content" dangerouslySetInnerHTML={{ __html: data.content || "<em>無內容</em>" }} />
                                         </div>
                                     </div>
                                 </div>

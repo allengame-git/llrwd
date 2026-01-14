@@ -44,7 +44,7 @@ LLRWD-RMS 是一個基於 Next.js 開發的專案項目資訊管理系統，提�
 | 語言 | TypeScript |
 | 資料庫 | Prisma + PostgreSQL (支援 Neon Serverless) |
 | 認證 | NextAuth.js |
-| 編輯器 | Tiptap (ProseMirror) |
+| 編輯器 | Tiptap (含巢狀編號、自動縮排、圖片調整、自定義表格與連結) |
 | PDF 生成 | pdf-lib + @pdf-lib/fontkit (純 JS，無需 Puppeteer) |
 | 樣式 | Vanilla CSS + CSS Variables |
 | 部署 | Docker + Nginx / Vercel + Neon |

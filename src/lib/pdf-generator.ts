@@ -383,9 +383,6 @@ export const generateQCDocument = async (
         const changeTypeMap: { [key: string]: string } = { 'CREATE': '新增', 'UPDATE': '修改', 'DELETE': '刪除', 'RESTORE': '還原' };
         drawField('變更類型:', changeTypeMap[history.changeType] || history.changeType, y); y -= 25;
 
-        const approvalDateStr = formatDate(new Date(history.createdAt));
-        drawField('變更日期:', approvalDateStr, y); y -= 25;
-
         // Divider
         page.drawLine({ start: { x: margin, y: y + 10 }, end: { x: width - margin, y: y + 10 }, thickness: 0.5, color: gray });
         y -= 10;
