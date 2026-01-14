@@ -22,6 +22,9 @@
 | Phase 17 | 專案複製功能 | ✅ 完成 |
 | Phase 18 | PDF-lib 重構與 Vercel 部署 | ✅ 完成 |
 | Phase 19 | 富文本編輯器強化 (巢狀編號、縮排) | ✅ 完成 |
+| Phase 20 | 品質文件 PDF 歷史快照功能恢復 (截圖方式) | ✅ 完成 |
+| Phase 21 | 品質文件 PDF 歷史快照強化 (時間軸與 Diff) | ✅ 完成 |
+| Phase 22 | PDF 截斷修復 (支援多頁分頁) | ✅ 完成 |
 
 ---
 
@@ -389,3 +392,36 @@
 - [x] 提取富文本樣式至 `globals.css` 中的 `.rich-text-content`
 - [x] 確保「項目詳情」、「審核清單」、「歷史版本」、「退回申請」樣式一致
 - [x] 整合 `TextAlign` 擴充套件並配置文字對齊樣式
+
+---
+
+## Phase 20: 品質文件 PDF 歷史快照功能恢復 (v1.9.1) ✅
+
+### Phase 20.1: 功能恢復 ✅
+
+- [x] 將品質文件第二頁的歷史快照改回使用 Puppeteer 截圖
+- [x] 整合 `renderHtmlToImage` 確保富文本排版完整性
+- [x] 實作截圖失敗時的文字摘要降級機制 (Fallback)
+
+---
+
+## Phase 21: 品質文件 PDF 歷史快照強化 (v1.9.2) ✅
+
+### Phase 21.1: HTML 模板與樣式強化 ✅
+
+- [x] 在 `pdf-generator.ts` 構建包含時間軸與 Diff 的 HTML 模板
+- [x] 注入 `.rich-text-content` 與時間軸專用 CSS
+- [x] 支援 `history.reviewChain` 渲染多輪審核紀錄
+- [x] 支援 `history.diff` 渲染變更前後對照卡片
+- [x] 整合至 `generateQCDocument` 並驗證截圖完整性
+
+---
+
+## Phase 22: PDF 截斷修復 (支援多頁分頁) ✅
+
+### Phase 22.1: 改用 Puppeteer PDF 生成 ✅
+
+- [x] 在 `html-renderer.ts` 實作 `renderHtmlToPdf`
+- [x] 在 `pdf-generator.ts` 改用 PDF 合併模式
+- [x] 移除 1000px 高度限制，支援自然分頁
+- [x] 保持文字清晰度與可搜尋性

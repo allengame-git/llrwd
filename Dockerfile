@@ -26,6 +26,19 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Install Chromium and dependencies for Puppeteer
+RUN apk add --no-cache \
+      chromium \
+      nss \
+      freetype \
+      harfbuzz \
+      ca-certificates \
+      ttf-freefont
+
+# Tell Puppeteer to skip installing Chrome. We'll use the installed package.
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -38,8 +51,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Create directories for data persistence
-RUN mkdir -p /app/data /app/public/uploads
-RUN chown -R nextjs:nodejs /app/data /app/public/uploads
+RUN mkdir -p /app/data /app/public/uploads /app/public/iso_doc
+RUN chown -R nextjs:nodejs /app/data /app/public/uploads /app/public/iso_doc
 
 USER nextjs
 

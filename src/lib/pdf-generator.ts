@@ -2,6 +2,8 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import * as fs from 'fs';
 import * as path from 'path';
+import { renderHtmlToImage, renderHtmlToPdf } from './html-renderer';
+import { formatDate, formatDateTime } from './date-utils';
 
 // Types
 interface ItemHistory {
@@ -518,17 +520,255 @@ export const generateQCDocument = async (
         drawSigBox(width - margin - sigBoxWidth, '計畫主管核定 (PM)', history.pmUser, history.pmNote, history.pmDate);
 
         // ==========================================
-        // ATTACHMENT: History Summary Pages (pdf-lib, no Puppeteer)
+        // ATTACHMENT: History Content Screenshot (Puppeteer)
         // Only attach if PM Approved (pmDate is present)
         // ==========================================
         if (history.pmDate) {
             try {
-                // Generate History Summary Pages directly into pdfDoc
-                await generateHistorySummaryPages(history, pdfDoc, font);
-                console.log('[generateQCDocument] Added history summary pages.');
+                // Parse snapshot to get HTML content
+                const snapshot = JSON.parse(history.snapshot);
+
+                // 0. Process Image URLs and Fix HTML content
+                const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+                let htmlContent = snapshot.content || '<p>(無內容)</p>';
+
+                // Replace relative image URLs with absolute ones for Puppeteer
+                htmlContent = htmlContent.replace(/src="\/api\/image\/([^"]+)"/g, `src="${baseUrl}/api/image/$1"`);
+
+                const diff = history.diff ? JSON.parse(history.diff) : null;
+                const reviewChain = (history as any).reviewChain || [];
+
+                // 1. Build Timeline HTML (Vertical layout to avoid truncation)
+                let timelineHtml = '';
+                if (reviewChain.length > 0) {
+                    const sortedChain = [...reviewChain].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                    timelineHtml = `
+                        <div class="section-title">審核時間軸</div>
+                        <div class="timeline-vertical">
+                            ${sortedChain.map((req, idx) => `
+                                <div class="timeline-cycle">
+                                    <div class="cycle-label">第 ${idx + 1} 次審核週期</div>
+                                    <div class="event">
+                                        <div class="event-dot info"></div>
+                                        <div class="event-content">
+                                            <div class="event-header">
+                                                <span class="badge info">${req.previousRequestId ? '重新提交' : '提交'}</span>
+                                                <span class="user">${req.submittedBy?.username || req.submitterName || '提交者'}</span>
+                                                <span class="date">${formatDateTime(req.createdAt)}</span>
+                                            </div>
+                                            ${req.submitReason ? `<div class="note">編輯原因：${req.submitReason}</div>` : ''}
+                                        </div>
+                                    </div>
+                                    ${req.reviewedBy ? `
+                                        <div class="event">
+                                            <div class="event-dot ${req.status === 'APPROVED' ? 'success' : 'danger'}"></div>
+                                            <div class="event-content">
+                                                <div class="event-header">
+                                                    <span class="badge ${req.status === 'APPROVED' ? 'success' : 'danger'}">${req.status === 'APPROVED' ? '核准' : '退回修改'}</span>
+                                                    <span class="user">${req.reviewedBy.username}</span>
+                                                    <span class="date">${formatDateTime(req.updatedAt)}</span>
+                                                </div>
+                                                ${req.reviewNote ? `<div class="note">審查意見：${req.reviewNote}</div>` : ''}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+                // Helper to format list items (relatedItems / references / attachments)
+                const formatListData = (key: string, data: any) => {
+                    if (!Array.isArray(data) || data.length === 0) {
+                        if (typeof data === 'string' && data.startsWith('[')) {
+                            try {
+                                data = JSON.parse(data);
+                            } catch (e) { return '(無內容)'; }
+                        } else if (typeof data !== 'object') {
+                            return String(data || '(無內容)');
+                        }
+                    }
+                    if (!Array.isArray(data) || data.length === 0) return '(無內容)';
+
+                    if (key === 'relatedItems') {
+                        return `<div class="list-container">${data.map(ri => `
+                            <div class="list-item">
+                                <div class="list-id">${ri.fullId}</div>
+                                <div class="list-body">${ri.title || ''}</div>
+                            </div>
+                        `).join('')}</div>`;
+                    }
+                    if (key === 'references') {
+                        return `<div class="list-container">${data.map(ref => `
+                            <div class="list-item">
+                                <div class="list-id">${ref.dataName} (${ref.dataYear})</div>
+                                <div class="list-body">作者: ${ref.author}</div>
+                            </div>
+                        `).join('')}</div>`;
+                    }
+                    if (key === 'attachments' || (key === 'references' && data[0]?.path)) {
+                        return `<div class="list-container">${data.map(file => `
+                            <div class="list-item">
+                                <div class="list-id">📎 ${file.name || '未命名檔案'}</div>
+                                <div class="list-body">${file.path ? `路徑: ${file.path}` : ''}</div>
+                            </div>
+                        `).join('')}</div>`;
+                    }
+                    return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                };
+
+                // 2. Build Diff HTML
+                let diffHtml = '';
+                if (diff) {
+                    diffHtml = `<div class="section-title">變更內容</div>`;
+                    for (const [key, value] of Object.entries(diff) as [string, any][]) {
+                        const label = key === 'relatedItems' ? '關聯項目' : key === 'references' ? '參考文獻' : key === 'content' ? '內容' : key === 'title' ? '標題' : key === 'attachments' ? '附件' : key;
+                        const isHtml = key === 'content';
+                        const isList = key === 'relatedItems' || key === 'references' || key === 'attachments';
+
+                        diffHtml += `
+                            <div class="diff-item">
+                                <div class="diff-label">${label}</div>
+                                <div class="diff-grid">
+                                    <div class="diff-box old">
+                                        <div class="diff-tag">修改前</div>
+                                        ${isHtml ? `<div class="rich-text-content">${value.old || '(空白)'}</div>` : (isList ? formatListData(key, value.old) : `<pre>${typeof value.old === 'object' ? JSON.stringify(value.old, null, 2) : String(value.old ?? '')}</pre>`)}
+                                    </div>
+                                    <div class="diff-box new">
+                                        <div class="diff-tag">修改後</div>
+                                        ${isHtml ? `<div class="rich-text-content">${value.new || '(空白)'}</div>` : (isList ? formatListData(key, value.new) : `<pre>${typeof value.new === 'object' ? JSON.stringify(value.new, null, 2) : String(value.new ?? '')}</pre>`)}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                // 3. Build Full Template
+                const fullTemplate = `
+                    <style>
+                        body { font-family: sans-serif; padding: 20px; color: #333; line-height: 1.5; }
+                        .section-title { font-size: 18px; font-weight: bold; margin: 30px 0 15px; border-bottom: 2px solid #00838f; color: #00838f; padding-bottom: 5px; }
+                        
+                        .timeline-vertical { display: flex; flexDirection: column; gap: 10px; }
+                        .timeline-cycle { border: 1px solid #eee; borderRadius: 8px; padding: 15px; background: #fafafa; margin-bottom: 10px; }
+                        .cycle-label { font-size: 13px; font-weight: bold; color: #666; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                        
+                        .event { position: relative; padding-left: 20px; border-left: 2px solid #eee; margin-bottom: 15px; }
+                        .event:last-child { margin-bottom: 0; }
+                        .event-dot { position: absolute; left: -6px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: #ddd; border: 2px solid #fff; }
+                        .event-dot.info { background: #3b82f6; }
+                        .event-dot.success { background: #10b981; }
+                        .event-dot.danger { background: #ef4444; }
+                        .event-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+                        .badge { font-size: 10px; padding: 2px 6px; border-radius: 10px; color: #fff; font-weight: bold; }
+                        .badge.info { background: #3b82f6; }
+                        .badge.success { background: #10b981; }
+                        .badge.danger { background: #ef4444; }
+                        .user { font-weight: bold; font-size: 13px; }
+                        .date { font-size: 11px; color: #888; margin-left: auto; }
+                        .note { font-size: 12px; background: #fff; padding: 8px; border-radius: 4px; margin-top: 5px; border: 1px solid #eee; border-left: 3px solid #ddd; word-break: break-word; }
+                        
+                        img { max-width: 100%; height: auto; object-fit: contain; display: block; margin: 10px 0; border-radius: 4px; }
+
+                        .diff-item { margin-bottom: 25px; }
+                        .diff-label { font-weight: bold; font-size: 14px; margin-bottom: 10px; color: #555; text-transform: uppercase; }
+                        .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+                        .diff-box { padding: 15px; border-radius: 8px; border: 1px solid #eee; position: relative; }
+                        .diff-box.old { background: #fff5f5; border-color: #feb2b2; }
+                        .diff-box.new { background: #f0fff4; border-color: #9ae6b4; }
+                        .diff-tag { font-size: 10px; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; }
+                        .old .diff-tag { color: #c53030; }
+                        .new .diff-tag { color: #276749; }
+                        pre { font-size: 12px; white-space: pre-wrap; margin: 0; overflow: hidden; }
+
+                        .list-container { display: flex; flex-direction: column; gap: 5px; }
+                        .list-item { font-size: 12px; padding: 5px; background: rgba(255,255,255,0.5); border-radius: 4px; border: 1px solid rgba(0,0,0,0.05); }
+                        .list-id { font-weight: bold; color: #00838f; font-family: monospace; }
+                        .list-body { color: #666; font-size: 11px; }
+
+                        .snapshot-section { margin-top: 40px; }
+                        .snapshot-card { border: 1px solid #ddd; padding: 20px; border-radius: 8px; background: #fff; }
+                        .snapshot-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; }
+
+                        .rich-text-content { font-size: 13px; }
+                        .rich-text-content ol { counter-reset: item; list-style-type: none; padding-left: 0; }
+                        .rich-text-content li { display: block; position: relative; padding-left: 2.5em; margin-bottom: 0.5em; }
+                        .rich-text-content li::before { content: counters(item, ".") ". "; counter-increment: item; position: absolute; left: 0; font-weight: bold; color: #00838f; width: 2.2em; text-align: right; }
+                        .rich-text-content li p { margin: 0; display: inline; }
+                        .rich-text-content table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+                        .rich-text-content th, .rich-text-content td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        .rich-text-content th { background: #f5f5f5; }
+                    </style>
+                    <div class="header">
+                        <div style="font-size: 24px; font-weight: bold; color: #00838f;">歷史版本快照 - v${history.version}</div>
+                        <div style="color: #666;">項目：${history.itemFullId} - ${history.itemTitle}</div>
+                    </div>
+
+                    ${timelineHtml}
+                    ${diffHtml}
+
+                    <div class="snapshot-section">
+                        <div class="section-title">版本內容快照 (最終狀態)</div>
+                        <div class="snapshot-card">
+                            <div style="margin-bottom: 15px;">
+                                <div style="font-size: 12px; color: #666; font-weight: bold; margin-bottom: 5px;">標題</div>
+                                <div class="snapshot-title">${snapshot.title}</div>
+                            </div>
+                            
+                            <div style="margin-bottom: 20px;">
+                                <div style="font-size: 12px; color: #666; font-weight: bold; margin-bottom: 5px;">內容</div>
+                                <div class="rich-text-content">${htmlContent}</div>
+                            </div>
+
+                            ${snapshot.relatedItems && snapshot.relatedItems.length > 0 ? `
+                                <div style="margin-bottom: 20px;">
+                                    <div style="font-size: 12px; color: #666; font-weight: bold; margin-bottom: 10px;">關聯項目</div>
+                                    ${formatListData('relatedItems', snapshot.relatedItems)}
+                                </div>
+                            ` : ''}
+
+                            ${snapshot.references && snapshot.references.length > 0 ? `
+                                <div style="margin-bottom: 20px;">
+                                    <div style="font-size: 12px; color: #666; font-weight: bold; margin-bottom: 10px;">參考文獻</div>
+                                    ${formatListData('references', snapshot.references)}
+                                </div>
+                            ` : ''}
+
+                            ${snapshot.attachments && snapshot.attachments.length > 0 ? `
+                                <div style="margin-bottom: 20px;">
+                                    <div style="font-size: 12px; color: #666; font-weight: bold; margin-bottom: 10px;">附件</div>
+                                    ${formatListData('attachments', snapshot.attachments)}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+
+                // Use Puppeteer to capture enhanced history PDF
+                console.log('[generateQCDocument] Generating enhanced history PDF with Puppeteer...');
+                const historyPdfBuffer = await renderHtmlToPdf(fullTemplate);
+
+                // Load the generated history PDF
+                const historyPdfDoc = await PDFDocument.load(historyPdfBuffer);
+                const historyPages = await pdfDoc.copyPages(historyPdfDoc, historyPdfDoc.getPageIndices());
+
+                // Add pages to main document
+                historyPages.forEach((historyPage) => {
+                    pdfDoc.addPage(historyPage);
+                });
+
+                console.log(`[generateQCDocument] Attached ${historyPages.length} history pages successfully.`);
             } catch (err) {
-                console.error('[generateQCDocument] Failed to generate history summary:', err);
-                // Continue saving without attachment if this fails
+                console.error('[generateQCDocument] Failed to generate history PDF:', err);
+                // Fallback: try text-based summary if PDF generation fails
+                try {
+                    await generateHistorySummaryPages(history, pdfDoc, font);
+                    console.log('[generateQCDocument] Fallback: Added text-based history summary.');
+                } catch (fallbackErr) {
+                    console.error('[generateQCDocument] Fallback also failed:', fallbackErr);
+                }
             }
         }
 

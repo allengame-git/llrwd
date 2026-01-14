@@ -20,7 +20,7 @@ LLRWD-RMS 是一個基於 Next.js 開發的專案項目資訊管理系統，提�
 - 📎 **檔案附件** - 支援 PDF、Word、圖片上傳
 - 📄 **檔案管理系統** - 獨立檔案管理模組，支援拖放上傳 (100MB)、年份分類、卡片/清單雙視圖、排序、搜尋、審核流程與前後比較
 - 🕰️ **項目歷史紀錄** - 完整記錄項目的建立、變更與刪除歷史，支援版本比對 (Diff) 與快照檢視
-- 📄 **ISO 品質文件生成** - 項目變更審核通過後自動生成 PDF 品質紀錄單 (純 pdf-lib 實作，無需 Puppeteer)
+- 📄 **ISO 品質文件生成** - 項目變更審核通過後自動生成 PDF 品質紀錄單 (結合 pdf-lib 與 Puppeteer 實現高真度多頁歷史快照)
 - 🔍 **ISO 文件搜尋與下載** - 支援按專案搜尋文件、顯示最近更新紀錄、直接下載 PDF
 - ✍️ **品質文件數位簽章** - 兩階段審核流程 (QC 審核 → PM 核定)，自動嵌入 QC/PM 數位簽名至 PDF
 - ✅ **簽核意見自動填入** - 審核者/QC/PM 若未填寫意見，自動填入「同意」
@@ -44,10 +44,24 @@ LLRWD-RMS 是一個基於 Next.js 開發的專案項目資訊管理系統，提�
 | 語言 | TypeScript |
 | 資料庫 | Prisma + PostgreSQL (支援 Neon Serverless) |
 | 認證 | NextAuth.js |
-| 編輯器 | Tiptap (含巢狀編號、自動縮排、圖片調整、自定義表格與連結) |
-| PDF 生成 | pdf-lib + @pdf-lib/fontkit (純 JS，無需 Puppeteer) |
+| 編輯器 | Tiptap 2 (含圖片縮放、自定義表格、巢狀編號) |
+| PDF 生成 | pdf-lib + Puppeteer (多頁支持、歷史快照高真度渲染) |
+| 導航佈局 | Accordion Sidebar (樹狀結構與歷史分頁) |
 | 樣式 | Vanilla CSS + CSS Variables |
 | 部署 | Docker + Nginx / Vercel + Neon |
+
+### 核心套件說明
+
+為利於後續架設服務，以下為系統關鍵依賴套件：
+
+- **`next` / `react`**: 基礎開發框架
+- **`prisma` / `@prisma/client`**: 資料庫 ORM (PostgreSQL)
+- **`next-auth`**: 使用者認證系統
+- **`puppeteer`**: 用於 PDF 歷史快照的 HTML 渲染 (需安裝 Chromium 瀏覽器)
+- **`pdf-lib` / `@pdf-lib/fontkit`**: PDF 建立、分頁合併與數位簽章嵌入
+- **`tiptap` 系列**: 富文本編輯器核心與擴充介面
+- **`adm-zip` / `archiver`**: 系統備份與檔案壓縮功能
+- **`zustand`**: 前端狀態管理
 
 ## 資料庫遷移 (2026/01)
 
