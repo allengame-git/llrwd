@@ -38,30 +38,89 @@ LLRWD-RMS 是一個基於 Next.js 開發的專案項目資訊管理系統，提�
 
 ## 技術棧
 
-| 類別 | 技術 |
+| 類別 | 技術 | 版本 |
+|------|------|------|
+| 框架 | Next.js (App Router) | 14.2.35 |
+| 語言 | TypeScript | ^5 |
+| 資料庫 | Prisma + PostgreSQL | Prisma 5.22.0 |
+| 認證 | NextAuth.js | ^4.24.13 |
+| 編輯器 | Tiptap (ProseMirror-based) | ^3.14.0 |
+| PDF 生成 | pdf-lib + Puppeteer | pdf-lib ^1.17.1, puppeteer ^24.34.0 |
+| 狀態管理 | Zustand | ^5.0.9 |
+| 樣式 | Vanilla CSS + CSS Variables | - |
+| 部署 | Docker + Nginx / Vercel + Neon | - |
+
+---
+
+## 套件依賴說明
+
+以下為系統所有依賴套件的完整說明，確保新環境可順利安裝。
+
+### 核心框架
+
+| 套件 | 說明 | 安裝指令 |
+|------|------|----------|
+| `next` | Next.js 框架核心 | 已包含在 package.json |
+| `react` / `react-dom` | React UI 框架 | 已包含在 package.json |
+| `typescript` | TypeScript 語言支援 | 已包含在 devDependencies |
+
+### 資料庫與認證
+
+| 套件 | 說明 |
 |------|------|
-| 框架 | Next.js 14 (App Router) |
-| 語言 | TypeScript |
-| 資料庫 | Prisma + PostgreSQL (支援 Neon Serverless) |
-| 認證 | NextAuth.js |
-| 編輯器 | Tiptap 2 (含圖片縮放、自定義表格、巢狀編號) |
-| PDF 生成 | pdf-lib + Puppeteer (多頁支持、歷史快照高真度渲染) |
-| 導航佈局 | Accordion Sidebar (樹狀結構與歷史分頁) |
-| 樣式 | Vanilla CSS + CSS Variables |
-| 部署 | Docker + Nginx / Vercel + Neon |
+| `prisma` | 資料庫 ORM 開發工具 (devDependency) |
+| `@prisma/client` | Prisma 客戶端，用於資料庫查詢 |
+| `next-auth` | 使用者認證系統 (Credentials Provider) |
+| `bcryptjs` | 密碼雜湊加密 |
 
-### 核心套件說明
+### 富文本編輯器 (Tiptap)
 
-為利於後續架設服務，以下為系統關鍵依賴套件：
+| 套件 | 說明 |
+|------|------|
+| `@tiptap/react` | Tiptap React 綁定 |
+| `@tiptap/starter-kit` | 基礎編輯器功能套件 |
+| `@tiptap/extension-image` | 圖片插入功能 |
+| `@tiptap/extension-link` | 超連結功能 |
+| `@tiptap/extension-table` | 表格主功能 |
+| `@tiptap/extension-table-cell` | 表格儲存格 |
+| `@tiptap/extension-table-header` | 表格標題列 |
+| `@tiptap/extension-table-row` | 表格行 |
+| `@tiptap/extension-text-align` | 文字對齊功能 |
+| `tiptap-extension-resize-image` | 圖片縮放功能 |
 
-- **`next` / `react`**: 基礎開發框架
-- **`prisma` / `@prisma/client`**: 資料庫 ORM (PostgreSQL)
-- **`next-auth`**: 使用者認證系統
-- **`puppeteer`**: 用於 PDF 歷史快照的 HTML 渲染 (需安裝 Chromium 瀏覽器)
-- **`pdf-lib` / `@pdf-lib/fontkit`**: PDF 建立、分頁合併與數位簽章嵌入
-- **`tiptap` 系列**: 富文本編輯器核心與擴充介面
-- **`adm-zip` / `archiver`**: 系統備份與檔案壓縮功能
-- **`zustand`**: 前端狀態管理
+### PDF 生成與處理
+
+| 套件 | 說明 |
+|------|------|
+| `pdf-lib` | 純 JavaScript PDF 生成/修改函式庫 |
+| `@pdf-lib/fontkit` | 自定義字型嵌入支援 (中文字型) |
+| `puppeteer` | 無頭瀏覽器，用於 HTML 轉 PDF 與截圖渲染 |
+| `pdfkit` | (備用) PDF 生成函式庫 |
+
+> ⚠️ **Puppeteer 注意事項**: 此套件會自動下載 Chromium 瀏覽器 (~200MB)，首次安裝需確保網路暢通。
+
+### 檔案處理
+
+| 套件 | 說明 |
+|------|------|
+| `adm-zip` | ZIP 檔案解壓縮 (用於備份還原) |
+| `archiver` | ZIP 檔案壓縮 (用於系統備份) |
+
+### UI 工具
+
+| 套件 | 說明 |
+|------|------|
+| `clsx` | 條件式 CSS class 名稱組合工具 |
+| `zustand` | 輕量級前端狀態管理 |
+| `react-easy-crop` | 圖片裁切功能 (簽名上傳) |
+
+### 開發工具 (devDependencies)
+
+| 套件 | 說明 |
+|------|------|
+| `eslint` / `eslint-config-next` | 程式碼品質檢查 |
+| `vitest` | 單元測試框架 |
+| `@types/*` | TypeScript 型別定義 |
 
 ## 資料庫遷移 (2026/01)
 

@@ -22,6 +22,7 @@ interface NotificationListProps {
 export default function NotificationList({ initialNotifications }: NotificationListProps) {
   const [notifications, setNotifications] = useState(initialNotifications);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const router = useRouter();
 
   const filteredNotifications = notifications.filter((n) => {
@@ -53,8 +54,12 @@ export default function NotificationList({ initialNotifications }: NotificationL
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
-  const handleDeleteAllRead = async () => {
-    if (!window.confirm("確定要刪除所有已讀通知嗎？")) return;
+  const handleDeleteAllRead = () => {
+    setIsConfirmOpen(true);
+  };
+
+  const confirmDeleteAllRead = async () => {
+    setIsConfirmOpen(false);
     await deleteAllReadNotifications();
     setNotifications((prev) => prev.filter((n) => !n.isRead));
   };
@@ -158,6 +163,14 @@ export default function NotificationList({ initialNotifications }: NotificationL
           ))
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        title="刪除確認"
+        message="確定要刪除所有已讀通知嗎？此操作無法復原。"
+        onConfirm={confirmDeleteAllRead}
+        onCancel={() => setIsConfirmOpen(false)}
+      />
 
       <style jsx>{`
         .notification-page {
@@ -347,3 +360,133 @@ export default function NotificationList({ initialNotifications }: NotificationL
     </div>
   );
 }
+
+const ConfirmDialog = ({
+  isOpen,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmText = "確定",
+  cancelText = "取消",
+}: {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmText?: string;
+  cancelText?: string;
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="dialog-overlay" onClick={onCancel}>
+      <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
+        <h3 className="dialog-title">{title}</h3>
+        <p className="dialog-message">{message}</p>
+        <div className="dialog-actions">
+          <button className="dialog-btn cancel" onClick={onCancel}>
+            {cancelText}
+          </button>
+          <button className="dialog-btn confirm" onClick={onConfirm}>
+            {confirmText}
+          </button>
+        </div>
+      </div>
+      <style jsx>{`
+        .dialog-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0, 0, 0, 0.4);
+          backdrop-filter: blur(4px);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+          animation: fadeIn 0.2s ease-out;
+        }
+
+        .dialog-content {
+          background-color: var(--color-bg-surface);
+          padding: 24px;
+          border-radius: 12px;
+          min-width: 320px;
+          max-width: 400px;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          border: 1px solid var(--color-border);
+          transform: translateY(0);
+          animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .dialog-title {
+          margin: 0 0 12px 0;
+          font-size: 18px;
+          font-weight: 600;
+          color: var(--color-text-main);
+        }
+
+        .dialog-message {
+          margin: 0 0 24px 0;
+          color: var(--color-text-muted);
+          font-size: 14px;
+          line-height: 1.6;
+        }
+
+        .dialog-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+        }
+
+        .dialog-btn {
+          padding: 8px 20px;
+          border-radius: 6px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .cancel {
+          background-color: transparent;
+          border: 1px solid var(--color-border);
+          color: var(--color-text-main);
+        }
+
+        .cancel:hover {
+          background-color: var(--color-bg-base);
+        }
+
+        .confirm {
+          background-color: var(--color-danger);
+          border: none;
+          color: white;
+        }
+
+        .confirm:hover {
+          background-color: #b71c1c;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .confirm:active {
+          transform: translateY(0);
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+};

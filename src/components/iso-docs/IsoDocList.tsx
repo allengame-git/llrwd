@@ -12,7 +12,7 @@ type IsoDoc = {
     isoDocPath: string | null;
     createdAt: Date;
     submittedBy: { username: string } | null;
-    submitterName?: string | null;  // Fallback when user is deleted
+    submitterName?: string | null;
     reviewedBy: { username: string } | null;
     item?: { fullId: string; title: string } | null;
     qcApproval?: {
@@ -23,6 +23,16 @@ type IsoDoc = {
 
 type SortKey = 'itemFullId' | 'itemTitle' | 'version' | 'createdAt' | 'submittedBy';
 type SortOrder = 'asc' | 'desc';
+
+// 狀態標籤配置
+const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+    'REVISION_REQUIRED': { label: '待修訂', color: '#d97706', bgColor: 'rgba(249, 168, 37, 0.15)' },
+    'REJECTED': { label: '已退回', color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.15)' },
+    'COMPLETED': { label: '已完成', color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.15)' },
+    'PENDING_QC': { label: '待 QC 簽核', color: '#eab308', bgColor: 'rgba(234, 179, 8, 0.15)' },
+    'PENDING_PM': { label: '待 PM 簽核', color: '#3b82f6', bgColor: 'rgba(59, 130, 246, 0.15)' },
+    'APPROVED': { label: '已核准', color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.15)' }
+};
 
 export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
     const [sortKey, setSortKey] = useState<SortKey>('createdAt');
@@ -60,13 +70,13 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
             setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
         } else {
             setSortKey(key);
-            setSortOrder('asc'); // Default to ascending for new sort key
+            setSortOrder('asc');
         }
     };
 
     const getSortIcon = (key: SortKey) => {
-        if (sortKey !== key) return '↕️';
-        return sortOrder === 'asc' ? '↑' : '↓';
+        if (sortKey !== key) return '';
+        return sortOrder === 'asc' ? ' ↑' : ' ↓';
     };
 
     if (docs.length === 0) {
@@ -75,10 +85,22 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
                 textAlign: 'center',
                 padding: '4rem 2rem',
                 color: 'var(--color-text-muted)',
-                borderRadius: 'var(--radius-lg)'
+                borderRadius: 'var(--radius-lg)',
+                border: '1px dashed var(--color-border)'
             }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
-                <p>目前沒有品質文件記錄</p>
+                <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    style={{ marginBottom: '1rem', opacity: 0.4 }}
+                >
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <p style={{ margin: 0, fontSize: '0.95rem' }}>目前沒有品質文件記錄</p>
             </div>
         );
     }
@@ -87,33 +109,34 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
         <div className="glass" style={{
             padding: '1.5rem',
             borderRadius: 'var(--radius-lg)',
-            marginTop: '2rem'
+            border: '1px solid var(--color-border)'
         }}>
             <div style={{ overflowX: 'auto' }}>
                 <table style={{
                     width: '100%',
                     borderCollapse: 'collapse',
-                    fontSize: '0.9rem'
+                    fontSize: '0.85rem'
                 }}>
                     <thead>
                         <tr style={{
-                            borderBottom: '2px solid var(--color-border)',
+                            borderBottom: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-bg-elevated)',
                             textAlign: 'left'
                         }}>
                             <th style={thStyle} onClick={() => handleSort('itemFullId')}>
-                                項目編號 {getSortIcon('itemFullId')}
+                                項目編號{getSortIcon('itemFullId')}
                             </th>
                             <th style={thStyle} onClick={() => handleSort('itemTitle')}>
-                                標題 {getSortIcon('itemTitle')}
+                                標題{getSortIcon('itemTitle')}
                             </th>
                             <th style={thStyle} onClick={() => handleSort('version')}>
-                                版本 {getSortIcon('version')}
+                                版本{getSortIcon('version')}
                             </th>
                             <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => handleSort('createdAt')}>
-                                日期 {getSortIcon('createdAt')}
+                                日期{getSortIcon('createdAt')}
                             </th>
                             <th style={thStyle} onClick={() => handleSort('submittedBy')}>
-                                提交 / 核准 {getSortIcon('submittedBy')}
+                                提交 / 核准{getSortIcon('submittedBy')}
                             </th>
                             <th style={{ ...thStyle, textAlign: 'center' }}>
                                 狀態
@@ -124,126 +147,118 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedDocs.map(doc => (
-                            <tr
-                                key={doc.id}
-                                style={{
-                                    borderBottom: '1px solid var(--color-border)',
-                                    transition: 'background-color 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
-                            >
-                                <td style={{ padding: '0.75rem 1rem' }}>
-                                    <Link
-                                        href={`/admin/history/detail/${doc.id}`}
-                                        className="text-primary hover:underline font-mono"
-                                    >
-                                        {doc.item?.fullId || doc.itemFullId}
-                                    </Link>
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem' }}>
-                                    <div style={{
-                                        maxWidth: '300px',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap'
-                                    }}>
-                                        {doc.item?.title || doc.itemTitle}
-                                    </div>
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem' }}>
-                                    <span style={{
-                                        padding: '0.2rem 0.5rem',
-                                        backgroundColor: 'var(--color-info-bg)', // changed from primary-soft to match history "UPDATE" color loosely or keep distinct
-                                        color: 'var(--color-info)',
-                                        borderRadius: '4px',
-                                        fontSize: '0.8rem',
-                                        fontWeight: 600
-                                    }}>
-                                        v{doc.version}
-                                    </span>
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--color-text-muted)' }}>
-                                    {formatDate(doc.createdAt)}
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem' }}>
-                                    <div>{doc.submittedBy?.username || doc.submitterName || '(已刪除)'}</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                        {doc.reviewedBy?.username || '-'}
-                                    </div>
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                                    {doc.qcApproval?.status === 'REVISION_REQUIRED' ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                            <span style={{
-                                                padding: '0.2rem 0.5rem',
-                                                backgroundColor: 'rgba(249, 168, 37, 0.15)',
-                                                color: '#d97706',
-                                                borderRadius: '12px',
-                                                fontSize: '0.75rem',
+                        {sortedDocs.map(doc => {
+                            const status = doc.qcApproval?.status;
+                            const statusInfo = status ? statusConfig[status] : null;
+
+                            return (
+                                <tr
+                                    key={doc.id}
+                                    style={{
+                                        borderBottom: '1px solid var(--color-border)',
+                                        transition: 'background-color 0.15s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
+                                >
+                                    <td style={tdStyle}>
+                                        <Link
+                                            href={`/admin/history/detail/${doc.id}`}
+                                            style={{
+                                                fontFamily: 'var(--font-geist-mono)',
+                                                color: 'var(--color-primary)',
                                                 fontWeight: 600,
-                                                border: '1px solid rgba(249, 168, 37, 0.3)'
-                                            }}>
-                                                待修訂
-                                            </span>
-                                            {doc.qcApproval.revisionCount > 0 && (
-                                                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                                                    (修訂 {doc.qcApproval.revisionCount} 次)
-                                                </span>
-                                            )}
-                                        </div>
-                                    ) : doc.qcApproval?.status === 'REJECTED' ? (
-                                        <span style={{
-                                            padding: '0.2rem 0.5rem',
-                                            backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                                            color: '#ef4444',
-                                            borderRadius: '12px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 600,
-                                            border: '1px solid rgba(239, 68, 68, 0.3)'
+                                                textDecoration: 'none',
+                                                fontSize: '0.8rem'
+                                            }}
+                                        >
+                                            {doc.item?.fullId || doc.itemFullId}
+                                        </Link>
+                                    </td>
+                                    <td style={tdStyle}>
+                                        <div style={{
+                                            maxWidth: '250px',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
                                         }}>
-                                            已退回
-                                        </span>
-                                    ) : doc.qcApproval?.status === 'COMPLETED' ? (
+                                            {doc.item?.title || doc.itemTitle}
+                                        </div>
+                                    </td>
+                                    <td style={tdStyle}>
                                         <span style={{
                                             padding: '0.2rem 0.5rem',
-                                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                                            color: '#10b981',
-                                            borderRadius: '12px',
+                                            backgroundColor: 'var(--color-primary-soft)',
+                                            color: 'var(--color-primary)',
+                                            borderRadius: '4px',
                                             fontSize: '0.75rem',
                                             fontWeight: 600
                                         }}>
-                                            已完成
+                                            v{doc.version}
                                         </span>
-                                    ) : (
-                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>-</span>
-                                    )}
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem' }}>
-                                    {doc.isoDocPath ? (
-                                        <a
-                                            href={doc.isoDocPath}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="btn btn-outline"
-                                            style={{
-                                                padding: '0.25rem 0.75rem',
-                                                fontSize: '0.85rem',
-                                                textDecoration: 'none',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '0.25rem'
-                                            }}
-                                        >
-                                            📄 下載
-                                        </a>
-                                    ) : (
-                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>-</span>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+                                        {formatDate(doc.createdAt)}
+                                    </td>
+                                    <td style={tdStyle}>
+                                        <div>{doc.submittedBy?.username || doc.submitterName || '(已刪除)'}</div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                                            {doc.reviewedBy?.username || '—'}
+                                        </div>
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                        {statusInfo ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                                <span style={{
+                                                    padding: '0.25rem 0.5rem',
+                                                    backgroundColor: statusInfo.bgColor,
+                                                    color: statusInfo.color,
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 600
+                                                }}>
+                                                    {statusInfo.label}
+                                                </span>
+                                                {status === 'REVISION_REQUIRED' && doc.qcApproval && doc.qcApproval.revisionCount > 0 && (
+                                                    <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                                                        修訂 {doc.qcApproval.revisionCount} 次
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>—</span>
+                                        )}
+                                    </td>
+                                    <td style={tdStyle}>
+                                        {doc.isoDocPath ? (
+                                            <a
+                                                href={doc.isoDocPath}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn btn-outline"
+                                                style={{
+                                                    padding: '0.3rem 0.75rem',
+                                                    fontSize: '0.75rem',
+                                                    textDecoration: 'none',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.35rem'
+                                                }}
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                    <polyline points="7 10 12 15 17 10" />
+                                                    <line x1="12" y1="15" x2="12" y2="3" />
+                                                </svg>
+                                                下載
+                                            </a>
+                                        ) : (
+                                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>—</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -255,8 +270,16 @@ const thStyle: React.CSSProperties = {
     padding: '0.75rem 1rem',
     textAlign: 'left',
     fontWeight: 600,
-    fontSize: '0.9rem',
+    fontSize: '0.75rem',
+    color: 'var(--color-text-muted)',
     cursor: 'pointer',
     userSelect: 'none',
-    whiteSpace: 'nowrap'
+    whiteSpace: 'nowrap',
+    textTransform: 'uppercase',
+    letterSpacing: '0.025em'
+};
+
+const tdStyle: React.CSSProperties = {
+    padding: '0.75rem 1rem',
+    verticalAlign: 'middle'
 };

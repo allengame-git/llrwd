@@ -26,13 +26,22 @@ export default function IsoDocSearch() {
         <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
             <div style={{
                 position: 'absolute',
-                left: '12px',
+                left: '14px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                pointerEvents: 'none',
-                opacity: 0.5
+                pointerEvents: 'none'
             }}>
-                🔍
+                <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--color-text-muted)"
+                    strokeWidth="2"
+                >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                </svg>
             </div>
             <input
                 type="text"
@@ -41,31 +50,51 @@ export default function IsoDocSearch() {
                 defaultValue={searchParams.get('q')?.toString()}
                 style={{
                     width: '100%',
-                    padding: '0.6rem 1rem 0.6rem 2.5rem',
+                    padding: '0.65rem 1rem 0.65rem 2.75rem',
                     borderRadius: 'var(--radius-md)',
                     border: '1px solid var(--color-border)',
                     backgroundColor: 'var(--color-bg-elevated)',
                     color: 'var(--color-text)',
                     fontSize: '0.9rem',
                     outline: 'none',
-                    transition: 'border-color 0.2s',
-                    boxShadow: 'var(--shadow-sm)'
+                    transition: 'border-color 0.2s, box-shadow 0.2s'
                 }}
-                onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
-                onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
+                onFocus={(e) => {
+                    e.target.style.borderColor = 'var(--color-primary)';
+                    e.target.style.boxShadow = '0 0 0 3px var(--color-primary-soft)';
+                }}
+                onBlur={(e) => {
+                    e.target.style.borderColor = 'var(--color-border)';
+                    e.target.style.boxShadow = 'none';
+                }}
             />
             {isPending && (
                 <div style={{
                     position: 'absolute',
-                    right: '12px',
+                    right: '14px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    fontSize: '0.8rem',
                     color: 'var(--color-text-muted)'
                 }}>
-                    ...
+                    <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        style={{ animation: 'spin 1s linear infinite' }}
+                    >
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
                 </div>
             )}
+            <style jsx>{`
+                @keyframes spin {
+                    from { transform: translateY(-50%) rotate(0deg); }
+                    to { transform: translateY(-50%) rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 }

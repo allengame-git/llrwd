@@ -27,9 +27,9 @@ export async function createProject(prevState: ProjectState, formData: FormData)
         return { error: "Title and Code Prefix are required." };
     }
 
-    // Code Prefix format validation (uppercase, alphanumeric)
-    if (!/^[A-Z0-9]+$/.test(codePrefix)) {
-        return { error: "Code Prefix must be uppercase alphanumeric characters." };
+    // Code Prefix format validation (uppercase, alphanumeric, hyphen allowed)
+    if (!/^[A-Z0-9]+(-[A-Z0-9]+)*$/.test(codePrefix)) {
+        return { error: "代碼前綴僅可使用大寫英文字母、數字與連字號(-)" };
     }
 
     try {
@@ -139,10 +139,10 @@ export async function copyProject(
         return { error: "專案代碼為必填" };
     }
 
-    // Code Prefix format validation
+    // Code Prefix format validation (uppercase, alphanumeric, hyphen allowed)
     const normalizedPrefix = newCodePrefix.trim().toUpperCase();
-    if (!/^[A-Z0-9]+$/.test(normalizedPrefix)) {
-        return { error: "專案代碼僅可使用大寫英文字母與數字" };
+    if (!/^[A-Z0-9]+(-[A-Z0-9]+)*$/.test(normalizedPrefix)) {
+        return { error: "專案代碼僅可使用大寫英文字母、數字與連字號(-)" };
     }
 
     try {

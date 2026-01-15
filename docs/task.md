@@ -1,6 +1,6 @@
 # 低放射性廢棄物處置管理系統 - 開發進度 (task.md)
 
->> 最後更新: 2026-01-14
+>> 最後更新: 2026-01-15
 
 ## 進度總覽
 
@@ -25,6 +25,7 @@
 | Phase 20 | 品質文件 PDF 歷史快照功能恢復 (截圖方式) | ✅ 完成 |
 | Phase 21 | 品質文件 PDF 歷史快照強化 (時間軸與 Diff) | ✅ 完成 |
 | Phase 22 | PDF 截斷修復 (支援多頁分頁) | ✅ 完成 |
+| Phase 23 | 專案頁面中文化與 UI 優化 | ✅ 完成 |
 
 ---
 
@@ -425,3 +426,35 @@
 - [x] 在 `pdf-generator.ts` 改用 PDF 合併模式
 - [x] 移除 1000px 高度限制，支援自然分頁
 - [x] 保持文字清晰度與可搜尋性
+- [x] 修復通知頁面「刪除已讀」按鈕閃退問題 (改用 custom ConfirmDialog)
+
+---
+
+## Phase 23: 專案頁面中文化與 UI 優化 ✅
+
+### Phase 23.1: 專案詳情頁面中文化 ✅
+
+- [x] `/projects/[id]` 頁面返回連結中文化 (返回專案列表)
+- [x] 「Items」→「項目列表」
+- [x] 空狀態訊息中文化 (尚無項目資料)
+
+### Phase 23.2: 移除 Emoji 圖示 ✅
+
+- [x] `ProjectSearchBar.tsx` - 🔍 改為 SVG 搜尋圖示
+- [x] `SearchResultList.tsx` - 🔍 空狀態改為 SVG
+- [x] `CreateItemForm.tsx` - ✕ 改為 SVG X 圖示，加入動畫效果
+- [x] `RelatedItemsManager.tsx` - 📎 改為 SVG 連結圖示
+- [x] `ReferencesManager.tsx` - 📚📄🔍✓ 改為 SVG
+
+### Phase 23.3: 彈出視窗 UI 優化 ✅
+
+- [x] 新增項目表單優化 (標題區域、欄位樣式)
+- [x] 加入進場動畫 (fadeIn, slideUp)
+- [x] 關閉按鈕 hover 效果
+- [x] 提交按鈕加入圖示與 loading 狀態
+
+### Phase 23.4: 文件更新 ✅
+
+- [x] 更新 `README.md` - 加入完整套件依賴說明
+- [x] 更新 `docs/tech.md` - 加入套件依賴完整清單
+- [x] 更新 `docs/task.md` - 加入 Phase 23

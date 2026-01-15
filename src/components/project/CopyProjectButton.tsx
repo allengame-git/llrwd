@@ -190,7 +190,7 @@ export default function CopyProjectButton({ project, categories }: CopyProjectBu
                                 <input
                                     type="text"
                                     required
-                                    placeholder="例如：ABC"
+                                    placeholder="例如：ABC, DAREN-SI"
                                     value={formData.codePrefix}
                                     onChange={(e) => setFormData({ ...formData, codePrefix: e.target.value.toUpperCase() })}
                                     style={{
@@ -208,7 +208,7 @@ export default function CopyProjectButton({ project, categories }: CopyProjectBu
                                     color: "var(--color-text-muted)",
                                     marginTop: "0.5rem"
                                 }}>
-                                    僅限大寫英文字母與數字
+                                    大寫英文、數字與連字號(-)
                                 </p>
                             </div>
 

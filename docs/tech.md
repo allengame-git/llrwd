@@ -1,19 +1,95 @@
 # 技術文件 - 低放射性廢棄物處置管理系統 (tech.md)
 
->> 最後更新: 2026-01-14
+>> 最後更新: 2026-01-15
 
 ## 專案資訊
 
-| 項目 | 說明 |
-| :--- | :--- |
-| **專案名稱** | 低放射性廢棄物處置管理系統 (LLRWD-RMS) |
-| **技術棧** | Next.js 14, TypeScript, Prisma, PostgreSQL, NextAuth.js |
-| **樣式方案** | Vanilla CSS + CSS Variables |
-| **編輯器** | Tiptap (ProseMirror-based) |
-| **PDF 生成** | pdf-lib + Puppeteer (高真度多頁渲染) |
-| **部署方案** | Docker + Nginx / Vercel + Neon PostgreSQL |
+| 項目 | 說明 | 版本 |
+| :--- | :--- | :--- |
+| **專案名稱** | 低放射性廢棄物處置管理系統 (LLRWD-RMS) | v1.9.2 |
+| **技術棧** | Next.js, TypeScript, Prisma, PostgreSQL, NextAuth.js | - |
+| **樣式方案** | Vanilla CSS + CSS Variables | - |
+| **編輯器** | Tiptap (ProseMirror-based) | ^3.14.0 |
+| **PDF 生成** | pdf-lib + Puppeteer (高真度多頁渲染) | pdf-lib ^1.17.1 |
+| **部署方案** | Docker + Nginx / Vercel + Neon PostgreSQL | - |
 
 ---
+
+## 套件依賴完整清單
+
+> ⚠️ 以下為 `package.json` 中所有套件的詳細說明，確保新環境可順利安裝。
+
+### 生產環境套件 (dependencies)
+
+| 套件名稱 | 版本 | 用途說明 |
+| :--- | :--- | :--- |
+| `next` | 14.2.35 | Next.js 框架核心 |
+| `react` | ^18 | React UI 框架 |
+| `react-dom` | ^18 | React DOM 渲染 |
+| `@prisma/client` | 5.22.0 | Prisma 資料庫客戶端 |
+| `next-auth` | ^4.24.13 | 使用者認證系統 |
+| `bcryptjs` | ^3.0.3 | 密碼雜湊加密 |
+| `@tiptap/react` | ^3.14.0 | Tiptap 富文本編輯器 React 綁定 |
+| `@tiptap/starter-kit` | ^3.14.0 | Tiptap 基礎功能套件 |
+| `@tiptap/extension-image` | ^3.14.0 | 圖片插入功能 |
+| `@tiptap/extension-link` | ^3.14.0 | 超連結功能 |
+| `@tiptap/extension-table` | ^3.14.0 | 表格主功能 |
+| `@tiptap/extension-table-cell` | ^3.14.0 | 表格儲存格 |
+| `@tiptap/extension-table-header` | ^3.14.0 | 表格標題列 |
+| `@tiptap/extension-table-row` | ^3.14.0 | 表格行 |
+| `@tiptap/extension-text-align` | ^3.15.3 | 文字對齊功能 |
+| `tiptap-extension-resize-image` | ^1.3.2 | 圖片縮放功能 |
+| `pdf-lib` | ^1.17.1 | PDF 生成/修改函式庫 |
+| `@pdf-lib/fontkit` | ^1.1.1 | 自定義字型嵌入 (中文支援) |
+| `pdfkit` | ^0.17.2 | (備用) PDF 生成函式庫 |
+| `puppeteer` | ^24.34.0 | 無頭瀏覽器 (HTML 轉 PDF/截圖) |
+| `adm-zip` | ^0.5.16 | ZIP 檔案解壓縮 (備份還原) |
+| `archiver` | ^7.0.1 | ZIP 檔案壓縮 (系統備份) |
+| `clsx` | ^2.1.1 | CSS class 名稱條件組合 |
+| `zustand` | ^5.0.9 | 輕量級前端狀態管理 |
+| `react-easy-crop` | ^5.5.6 | 圖片裁切功能 (簽名上傳) |
+
+### 開發環境套件 (devDependencies)
+
+| 套件名稱 | 版本 | 用途說明 |
+| :--- | :--- | :--- |
+| `prisma` | 5.22.0 | Prisma CLI 開發工具 |
+| `typescript` | ^5 | TypeScript 編譯器 |
+| `eslint` | ^8 | 程式碼品質檢查 |
+| `eslint-config-next` | 14.2.35 | Next.js ESLint 設定 |
+| `vitest` | ^4.0.17 | 單元測試框架 |
+| `@types/node` | ^20 | Node.js 型別定義 |
+| `@types/react` | ^18 | React 型別定義 |
+| `@types/react-dom` | ^18 | React DOM 型別定義 |
+| `@types/bcryptjs` | ^2.4.6 | bcryptjs 型別定義 |
+| `@types/pdfkit` | ^0.17.4 | pdfkit 型別定義 |
+| `@types/adm-zip` | ^0.5.7 | adm-zip 型別定義 |
+| `@types/archiver` | ^7.0.0 | archiver 型別定義 |
+
+### 安裝指令
+
+```bash
+# 安裝所有套件
+npm install
+
+# 若需更新套件
+npm update
+
+# 若需安裝特定套件
+npm install <package-name>
+```
+
+### Puppeteer 特殊安裝說明
+
+Puppeteer 會自動下載 Chromium 瀏覽器 (~200MB)，在某些環境可能需要額外設定：
+
+```bash
+# 若需跳過 Chromium 下載 (使用系統 Chrome)
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# 設定執行路徑
+export PUPPETEER_EXECUTABLE_PATH=/path/to/chrome
+```
 
 ## 系統架構
 

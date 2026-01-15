@@ -82,14 +82,14 @@ export default function CreateProjectForm({ categories }: CreateProjectFormProps
                 </div>
 
                 <div className="flex-col gap-sm">
-                    <label htmlFor="codePrefix" style={{ fontSize: "0.9rem", fontWeight: 500 }}>代碼前綴 (大寫，項目編號用)</label>
+                    <label htmlFor="codePrefix" style={{ fontSize: "0.9rem", fontWeight: 500 }}>代碼前綴 (大寫英文、數字、連字號)</label>
                     <input
                         id="codePrefix"
                         name="codePrefix"
                         type="text"
                         required
-                        pattern="[A-Z0-9]+"
-                        placeholder="例如：WEB, Q4"
+                        pattern="[A-Z0-9]+(-[A-Z0-9]+)*"
+                        placeholder="例如：WEB, Q4, DAREN-SI"
                         className="input-field"
                         style={{ padding: "0.75rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border)" }}
                     />
