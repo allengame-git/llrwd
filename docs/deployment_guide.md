@@ -29,6 +29,7 @@
 | 後端 | Next.js API Routes + Server Actions | 統一處理 API 請求 |
 | 資料庫 | PostgreSQL + Prisma ORM | 強大且穩定的關聯式資料庫 |
 | 認證 | NextAuth.js | 內建認證機制 |
+| PDF 生成 | pdf-lib + Puppeteer | 支援多頁渲染與數位簽章 |
 | 富文編輯 | Tiptap | 文件內容編輯器 |
 
 ### 1.2 目錄結構
@@ -98,6 +99,19 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Install Chromium and dependencies for Puppeteer
+RUN apk add --no-cache \
+      chromium \
+      nss \
+      freetype \
+      harfbuzz \
+      ca-certificates \
+      ttf-freefont
+
+# Tell Puppeteer to skip installing Chrome. We'll use the installed package.
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -110,9 +124,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Create directories for data persistence
-# (Not needed for DB anymore, but good for uploads)
-RUN mkdir -p /app/public/uploads /app/public/iso_doc
-RUN chown -R nextjs:nodejs /app/public/uploads /app/public/iso_doc
+RUN mkdir -p /app/data /app/public/uploads /app/public/iso_doc
+RUN chown -R nextjs:nodejs /app/data /app/public/uploads /app/public/iso_doc
 
 USER nextjs
 

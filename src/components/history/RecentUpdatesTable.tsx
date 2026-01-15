@@ -34,15 +34,45 @@ function formatRelativeTime(date: Date): string {
 }
 
 // 操作類型標籤
-function getChangeTypeLabel(changeType: string): { label: string; color: string } {
+function getChangeTypeLabel(changeType: string): { label: string; color: string; bgColor: string } {
     switch (changeType) {
-        case 'CREATE': return { label: '新增', color: 'var(--color-success)' };
-        case 'UPDATE': return { label: '編輯', color: 'var(--color-warning)' };
-        case 'DELETE': return { label: '刪除', color: 'var(--color-danger)' };
-        case 'RESTORE': return { label: '還原', color: 'var(--color-info, #3b82f6)' };
-        default: return { label: changeType, color: 'var(--color-text-muted)' };
+        case 'CREATE': return { label: '新增', color: '#16a34a', bgColor: '#dcfce7' };
+        case 'UPDATE': return { label: '編輯', color: '#ca8a04', bgColor: '#fef9c3' };
+        case 'DELETE': return { label: '刪除', color: '#dc2626', bgColor: '#fee2e2' };
+        case 'RESTORE': return { label: '還原', color: '#2563eb', bgColor: '#dbeafe' };
+        default: return { label: changeType, color: '#6b7280', bgColor: '#f3f4f6' };
     }
 }
+
+// 類型標籤元件
+const TypeBadge = ({ type }: { type: 'ITEM' | 'FILE' }) => {
+    const isItem = type === 'ITEM';
+    return (
+        <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            padding: '0.3rem 0.6rem',
+            borderRadius: '4px',
+            fontSize: '0.7rem',
+            fontWeight: 600,
+            backgroundColor: isItem ? '#ede9fe' : '#e0f2fe',
+            color: isItem ? '#7c3aed' : '#0284c7'
+        }}>
+            {isItem ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                </svg>
+            ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                </svg>
+            )}
+            {isItem ? '項目' : '檔案'}
+        </span>
+    );
+};
 
 export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[] }) {
     const [filter, setFilter] = useState<'ALL' | 'ITEM' | 'FILE'>('ALL');
@@ -56,117 +86,110 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
         <div className="glass" style={{
             padding: '1.5rem',
             borderRadius: 'var(--radius-lg)',
-            marginTop: '2rem'
+            border: '1px solid var(--color-border)'
         }}>
             {/* Header with filter */}
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '1rem',
+                marginBottom: '1.25rem',
                 flexWrap: 'wrap',
                 gap: '1rem'
             }}>
-                <h2 style={{
-                    fontSize: '1.4rem',
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                }}>
-                    📋 最近更新紀錄
-                    <span style={{
-                        fontSize: '0.85rem',
-                        fontWeight: 'normal',
-                        color: 'var(--color-text-muted)',
-                        marginLeft: '0.5rem'
+                <div>
+                    <h2 style={{
+                        fontSize: '1.25rem',
+                        fontWeight: 600,
+                        marginBottom: '0.25rem',
+                        color: 'var(--color-text-main)'
                     }}>
-                        ({filteredUpdates.length} 筆)
+                        最近更新紀錄
+                    </h2>
+                    <span style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--color-text-muted)'
+                    }}>
+                        共 {filteredUpdates.length} 筆紀錄
                     </span>
-                </h2>
+                </div>
 
                 {/* Filter Tabs */}
                 <div style={{
                     display: 'flex',
                     gap: '0.5rem',
                     backgroundColor: 'var(--color-bg-elevated)',
-                    padding: '0.25rem',
-                    borderRadius: 'var(--radius-md)'
+                    padding: '0.3rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)'
                 }}>
-                    <button
-                        onClick={() => setFilter('ALL')}
-                        style={{
-                            padding: '0.5rem 1rem',
-                            borderRadius: 'var(--radius-sm)',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            fontWeight: filter === 'ALL' ? 600 : 400,
-                            backgroundColor: filter === 'ALL' ? 'var(--color-primary)' : 'transparent',
-                            color: filter === 'ALL' ? 'white' : 'var(--color-text)',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        全部
-                    </button>
-                    <button
-                        onClick={() => setFilter('ITEM')}
-                        style={{
-                            padding: '0.5rem 1rem',
-                            borderRadius: 'var(--radius-sm)',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            fontWeight: filter === 'ITEM' ? 600 : 400,
-                            backgroundColor: filter === 'ITEM' ? 'var(--color-primary)' : 'transparent',
-                            color: filter === 'ITEM' ? 'white' : 'var(--color-text)',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        📄 項目
-                    </button>
-                    <button
-                        onClick={() => setFilter('FILE')}
-                        style={{
-                            padding: '0.5rem 1rem',
-                            borderRadius: 'var(--radius-sm)',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            fontWeight: filter === 'FILE' ? 600 : 400,
-                            backgroundColor: filter === 'FILE' ? 'var(--color-primary)' : 'transparent',
-                            color: filter === 'FILE' ? 'white' : 'var(--color-text)',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        📁 檔案
-                    </button>
+                    {(['ALL', 'ITEM', 'FILE'] as const).map((f) => (
+                        <button
+                            key={f}
+                            onClick={() => setFilter(f)}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                borderRadius: 'var(--radius-sm)',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontWeight: filter === f ? 600 : 400,
+                                backgroundColor: filter === f ? 'var(--color-primary)' : 'transparent',
+                                color: filter === f ? 'white' : 'var(--color-text)',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            {f === 'ALL' ? '全部' : f === 'ITEM' ? '項目' : '檔案'}
+                        </button>
+                    ))}
                 </div>
             </div>
 
             {filteredUpdates.length === 0 ? (
-                <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '2rem' }}>
-                    {filter === 'ALL' ? '尚無更新紀錄' : `尚無${filter === 'ITEM' ? '項目' : '檔案'}更新紀錄`}
-                </p>
+                <div style={{
+                    color: 'var(--color-text-muted)',
+                    textAlign: 'center',
+                    padding: '3rem 2rem',
+                    backgroundColor: 'var(--color-bg-elevated)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px dashed var(--color-border)'
+                }}>
+                    <svg
+                        width="40"
+                        height="40"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        style={{ marginBottom: '0.75rem', opacity: 0.4 }}
+                    >
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                        {filter === 'ALL' ? '尚無更新紀錄' : `尚無${filter === 'ITEM' ? '項目' : '檔案'}更新紀錄`}
+                    </p>
+                </div>
             ) : (
                 <div style={{ overflowX: 'auto' }}>
                     <table style={{
                         width: '100%',
                         borderCollapse: 'collapse',
-                        fontSize: '0.9rem'
+                        fontSize: '0.85rem'
                     }}>
                         <thead>
                             <tr style={{
-                                borderBottom: '2px solid var(--color-border)',
+                                borderBottom: '1px solid var(--color-border)',
+                                backgroundColor: 'var(--color-bg-elevated)',
                                 textAlign: 'left'
                             }}>
-                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>類型</th>
-                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>操作</th>
-                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>編號/名稱</th>
-                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>專案/年度</th>
-                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>提交者</th>
-                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>核准者</th>
-                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>時間</th>
+                                <th style={thStyle}>類型</th>
+                                <th style={thStyle}>操作</th>
+                                <th style={thStyle}>編號 / 名稱</th>
+                                <th style={thStyle}>專案 / 年度</th>
+                                <th style={thStyle}>提交者</th>
+                                <th style={thStyle}>核准者</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>時間</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -177,34 +200,27 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
                                         key={update.id}
                                         style={{
                                             borderBottom: '1px solid var(--color-border)',
-                                            transition: 'background-color 0.2s'
+                                            transition: 'background-color 0.15s'
                                         }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
                                     >
-                                        <td style={{ padding: '0.75rem 1rem' }}>
-                                            <span style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '0.5rem'
-                                            }}>
-                                                {update.type === 'ITEM' ? '📄' : '📁'}
-                                                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                                                    {update.type === 'ITEM' ? '項目' : '檔案'}
-                                                </span>
-                                            </span>
+                                        <td style={tdStyle}>
+                                            <TypeBadge type={update.type} />
                                         </td>
-                                        <td style={{ padding: '0.75rem 1rem' }}>
+                                        <td style={tdStyle}>
                                             <span style={{
                                                 padding: '0.25rem 0.5rem',
                                                 borderRadius: '4px',
-                                                backgroundColor: `${changeInfo.color}20`,
+                                                backgroundColor: changeInfo.bgColor,
                                                 color: changeInfo.color,
-                                                fontSize: '0.8rem',
+                                                fontSize: '0.75rem',
                                                 fontWeight: 600
                                             }}>
                                                 {changeInfo.label}
                                             </span>
                                         </td>
-                                        <td style={{ padding: '0.75rem 1rem' }}>
+                                        <td style={tdStyle}>
                                             <div>
                                                 {update.targetId ? (
                                                     <Link
@@ -213,9 +229,9 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
                                                             fontFamily: 'var(--font-geist-mono)',
                                                             color: 'var(--color-primary)',
                                                             fontWeight: 600,
-                                                            textDecoration: 'none'
+                                                            textDecoration: 'none',
+                                                            fontSize: '0.8rem'
                                                         }}
-                                                        className="hover:underline"
                                                     >
                                                         {update.identifier}
                                                     </Link>
@@ -223,17 +239,18 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
                                                     <span style={{
                                                         fontFamily: 'var(--font-geist-mono)',
                                                         color: 'var(--color-primary)',
-                                                        fontWeight: 600
+                                                        fontWeight: 600,
+                                                        fontSize: '0.8rem'
                                                     }}>
                                                         {update.identifier}
                                                     </span>
                                                 )}
                                             </div>
                                             <div style={{
-                                                fontSize: '0.8rem',
+                                                fontSize: '0.75rem',
                                                 color: 'var(--color-text-muted)',
-                                                marginTop: '0.15rem',
-                                                maxWidth: '200px',
+                                                marginTop: '0.2rem',
+                                                maxWidth: '180px',
                                                 overflow: 'hidden',
                                                 textOverflow: 'ellipsis',
                                                 whiteSpace: 'nowrap'
@@ -242,7 +259,6 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
                                                     <Link
                                                         href={update.type === 'ITEM' ? `/items/${update.targetId}` : `/datafiles/${update.targetId}`}
                                                         style={{ color: 'inherit', textDecoration: 'none' }}
-                                                        className="hover:underline"
                                                     >
                                                         {update.name}
                                                     </Link>
@@ -251,20 +267,21 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
                                                 )}
                                             </div>
                                         </td>
-                                        <td style={{ padding: '0.75rem 1rem', color: 'var(--color-text-muted)' }}>
+                                        <td style={{ ...tdStyle, color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
                                             {update.projectTitle}
                                         </td>
-                                        <td style={{ padding: '0.75rem 1rem' }}>
+                                        <td style={tdStyle}>
                                             {update.submittedBy}
                                         </td>
-                                        <td style={{ padding: '0.75rem 1rem', color: update.reviewedBy ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
-                                            {update.reviewedBy || '-'}
+                                        <td style={{ ...tdStyle, color: update.reviewedBy ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+                                            {update.reviewedBy || '—'}
                                         </td>
                                         <td style={{
-                                            padding: '0.75rem 1rem',
+                                            ...tdStyle,
                                             textAlign: 'right',
                                             color: 'var(--color-text-muted)',
-                                            whiteSpace: 'nowrap'
+                                            whiteSpace: 'nowrap',
+                                            fontSize: '0.8rem'
                                         }}>
                                             {formatRelativeTime(update.createdAt)}
                                         </td>
@@ -278,3 +295,17 @@ export default function RecentUpdatesTable({ updates }: { updates: UpdateRecord[
         </div>
     );
 }
+
+const thStyle: React.CSSProperties = {
+    padding: '0.75rem 1rem',
+    fontWeight: 600,
+    fontSize: '0.75rem',
+    color: 'var(--color-text-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.025em'
+};
+
+const tdStyle: React.CSSProperties = {
+    padding: '0.75rem 1rem',
+    verticalAlign: 'middle'
+};

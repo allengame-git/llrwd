@@ -14,7 +14,41 @@
 | RAM | 8 GB | 16 GB |
 | 硬碟空間 | 20 GB | 50 GB (SSD) |
 | CPU | 4 核心 | 8 核心 |
+| 瀏覽器核心 | Chromium | Chrome / Edge (用於 PDF 渲染) |
 | 網路 | 可連線至 GitHub | 固定 IP (內網存取) |
+
+---
+
+## 核心技術棧與相依套件
+
+本系統基於 Next.js 14 構建，以下為關鍵相依套件說明，供系統架設參考：
+
+### 1. 核心框架與認證
+
+- **Next.js 14 (App Router)**: 前後端整合框架。
+- **TypeScript**: 確保開發型別安全。
+- **Next-Auth.js**: 實作使用者身份驗證與角色權限控管。
+
+### 2. 資料庫與 ORM
+
+- **PostgreSQL**: 主資料庫伺服器 (開發環境支援 Neon 或本地 Docker 版)。
+- **Prisma ORM**: 資料庫架構管理與優化查詢。
+
+### 3. PDF 功能 (重要依賴)
+
+- **puppeteer**: 核心依賴，用於將歷史快照 HTML 渲染為高真度 PDF。**部署環境必須安裝 Chromium**。
+- **pdf-lib**: 用於 PDF 文件編輯、分頁合併以及數位簽章嵌入。
+- **@pdf-lib/fontkit**: 支援 PDF 內嵌 Arial Unicode 等中文字型。
+
+### 4. 富文本編輯器
+
+- **Tiptap 2**: 核心編輯器，整合了表格、圖片縮放、巢狀編號及自動縮排等擴充套件。
+
+### 5. 系統工具
+
+- **adm-zip / archiver**: 用於實作系統備份與災難復原功能。
+- **bcryptjs**: 使用進階雜湊演算法確保密碼儲存安全。
+- **zustand**: 輕量化前端狀態管理，用於處理導覽列與主題切換。
 
 ---
 
@@ -142,6 +176,9 @@ NEXTAUTH_SECRET=$secret
 
 # Environment
 NODE_ENV=production
+
+# Puppeteer (Docker 環境已自動設定，開發環境可選填手動安裝的路徑)
+# PUPPETEER_EXECUTABLE_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
 "@ | Out-File -FilePath ".env" -Encoding UTF8
 ```
 

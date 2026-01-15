@@ -52,6 +52,17 @@ model User {
   loginLogs           LoginLog[]
 }
 
+model ProjectCategory {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  projects    Project[]
+}
+
 model Project {
   id          Int      @id @default(autoincrement())
   title       String
@@ -59,6 +70,10 @@ model Project {
   codePrefix  String   @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Category relation
+  categoryId  Int?
+  category    ProjectCategory? @relation(fields: [categoryId], references: [id])
 
   items       Item[]
 

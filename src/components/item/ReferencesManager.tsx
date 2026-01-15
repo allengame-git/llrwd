@@ -156,7 +156,11 @@ export default function ReferencesManager({
                 alignItems: 'center',
                 gap: '0.5rem'
             }}>
-                📚 參考文獻
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                參考文獻
                 <span style={{
                     fontSize: '0.85rem',
                     fontWeight: 'normal',
@@ -201,7 +205,10 @@ export default function ReferencesManager({
                                     }}>
                                         <div style={{ flex: 1 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                                <span style={{ fontSize: '1.1rem' }}>📄</span>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                    <polyline points="14 2 14 8 20 8" />
+                                                </svg>
                                                 <Link
                                                     href={`/api/datafiles/${ref.fileId}/download`}
                                                     target="_blank"
@@ -348,9 +355,16 @@ export default function ReferencesManager({
                     <div style={{
                         fontSize: '0.9rem',
                         fontWeight: 600,
-                        marginBottom: '0.25rem'
+                        marginBottom: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
                     }}>
-                        🔍 搜尋檔案
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                        </svg>
+                        搜尋檔案
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -416,24 +430,32 @@ export default function ReferencesManager({
                                         }}
                                     >
                                         <div>
-                                            <div style={{ fontWeight: 500 }}>
-                                                📄 {file.dataName}
+                                            <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                    <polyline points="14 2 14 8 20 8" />
+                                                </svg>
+                                                {file.dataName}
                                                 <span style={{
-                                                    marginLeft: '0.5rem',
                                                     fontSize: '0.8rem',
                                                     color: 'var(--color-text-muted)'
                                                 }}>
                                                     ({file.dataYear})
                                                 </span>
                                             </div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                                                作者：{file.author} | {file.dataCode}
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginLeft: '1.4rem' }}>
+                                                作者：{file.author}
                                             </div>
                                         </div>
                                         {isAdded ? (
                                             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>已引用</span>
                                         ) : isSelected ? (
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)' }}>✓ 已選取</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                                    <polyline points="20 6 9 17 4 12" />
+                                                </svg>
+                                                已選取
+                                            </span>
                                         ) : null}
                                     </div>
                                 );

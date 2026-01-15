@@ -210,7 +210,7 @@ export default function ReviewProcessTimeline({
                 fontSize: "0.9rem",
                 borderRadius: "var(--radius-md) var(--radius-md) 0 0"
             }}>
-                📋 審核時間軸
+                審核時間軸
             </div>
             <div style={{
                 padding: "1.5rem",

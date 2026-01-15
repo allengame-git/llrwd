@@ -162,3 +162,42 @@ export async function renderHtmlToFile(
     fs.writeFileSync(outputPath, imageBuffer);
     console.log('[renderHtmlToFile] Image saved to:', outputPath);
 }
+
+/**
+ * Render HTML content to a PDF buffer using Puppeteer
+ * @param htmlContent - The HTML content to render
+ * @returns Buffer containing the PDF data
+ */
+export async function renderHtmlToPdf(
+    htmlContent: string
+): Promise<Buffer> {
+    console.log('[renderHtmlToPdf] Starting HTML to PDF conversion');
+
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    try {
+        const page = await browser.newPage();
+
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            margin: {
+                top: '20mm',
+                right: '20mm',
+                bottom: '20mm',
+                left: '20mm'
+            },
+            printBackground: true
+        });
+
+        console.log('[renderHtmlToPdf] PDF generated, size:', pdfBuffer.length, 'bytes');
+        return Buffer.from(pdfBuffer);
+
+    } finally {
+        await browser.close();
+    }
+}

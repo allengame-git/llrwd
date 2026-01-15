@@ -26,15 +26,15 @@ export default async function DataFileDetailPage({
     };
 
     const getFileIcon = (mimeType: string) => {
-        if (mimeType.startsWith('image/')) return '🖼️';
-        if (mimeType.includes('pdf')) return '📄';
-        if (mimeType.includes('word') || mimeType.includes('document')) return '📝';
-        if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📊';
-        if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return '📽️';
-        if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('archive')) return '📦';
-        if (mimeType.includes('video')) return '🎬';
-        if (mimeType.includes('audio')) return '🎵';
-        return '📁';
+        if (mimeType.startsWith('image/')) return 'IMG';
+        if (mimeType.includes('pdf')) return 'PDF';
+        if (mimeType.includes('word') || mimeType.includes('document')) return 'DOC';
+        if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'XLS';
+        if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'PPT';
+        if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('archive')) return 'ZIP';
+        if (mimeType.includes('video')) return 'VID';
+        if (mimeType.includes('audio')) return 'AUD';
+        return 'FILE';
     };
 
     // Get uploader and approver from first CREATE history record
@@ -71,7 +71,15 @@ export default async function DataFileDetailPage({
                     marginBottom: '1.5rem'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <span style={{ fontSize: '3rem' }}>{getFileIcon(file.mimeType)}</span>
+                        <span style={{
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            padding: '0.75rem 1rem',
+                            backgroundColor: 'var(--color-primary-soft)',
+                            color: 'var(--color-primary)',
+                            borderRadius: 'var(--radius-md)',
+                            fontFamily: 'monospace'
+                        }}>{getFileIcon(file.mimeType)}</span>
                         <div>
                             <h1 style={{
                                 fontSize: '1.5rem',
@@ -191,7 +199,7 @@ export default async function DataFileDetailPage({
                         className="btn btn-primary"
                         style={{ textDecoration: 'none' }}
                     >
-                        ⬇️ 下載檔案
+                        下載檔案
                     </a>
 
                     {canEdit && (
@@ -214,7 +222,7 @@ export default async function DataFileDetailPage({
                         fontWeight: 600,
                         marginBottom: '1rem'
                     }}>
-                        📜 變更歷史
+                        變更歷史
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         {file.history.map((h: any) => (

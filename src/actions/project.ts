@@ -20,14 +20,16 @@ export async function createProject(prevState: ProjectState, formData: FormData)
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
     const codePrefix = formData.get("codePrefix") as string;
+    const categoryIdStr = formData.get("categoryId") as string;
+    const categoryId = categoryIdStr ? parseInt(categoryIdStr, 10) : null;
 
     if (!title || !codePrefix) {
         return { error: "Title and Code Prefix are required." };
     }
 
-    // Code Prefix format validation (uppercase, alphanumeric)
-    if (!/^[A-Z0-9]+$/.test(codePrefix)) {
-        return { error: "Code Prefix must be uppercase alphanumeric characters." };
+    // Code Prefix format validation (uppercase, alphanumeric, hyphen allowed)
+    if (!/^[A-Z0-9]+(-[A-Z0-9]+)*$/.test(codePrefix)) {
+        return { error: "代碼前綴僅可使用大寫英文字母、數字與連字號(-)" };
     }
 
     try {
@@ -36,6 +38,7 @@ export async function createProject(prevState: ProjectState, formData: FormData)
                 title,
                 description,
                 codePrefix,
+                categoryId,
             },
         });
 
@@ -46,6 +49,42 @@ export async function createProject(prevState: ProjectState, formData: FormData)
             return { error: "Code Prefix already exists." };
         }
         return { error: "Failed to create project." };
+    }
+}
+
+/**
+ * Update project directly (ADMIN/PM only - no approval needed)
+ */
+export async function updateProject(
+    projectId: number,
+    title: string,
+    description?: string,
+    categoryId?: number | null
+): Promise<ProjectState> {
+    const session = await getServerSession(authOptions);
+
+    if (!session || (session.user.role !== "ADMIN" && !session.user.isPM)) {
+        return { error: "權限不足：僅管理員與專案經理可直接編輯專案" };
+    }
+
+    if (!title?.trim()) {
+        return { error: "專案標題為必填" };
+    }
+
+    try {
+        await prisma.project.update({
+            where: { id: projectId },
+            data: {
+                title: title.trim(),
+                description: description?.trim() || null,
+                categoryId: categoryId ?? undefined
+            }
+        });
+
+        revalidatePath("/projects");
+        return { message: "專案更新成功" };
+    } catch (e: any) {
+        return { error: "更新失敗: " + (e.message || "未知錯誤") };
     }
 }
 
@@ -82,7 +121,8 @@ export async function copyProject(
     sourceProjectId: number,
     newTitle: string,
     newCodePrefix: string,
-    newDescription?: string
+    newDescription?: string,
+    newCategoryId?: number | null
 ): Promise<ProjectState> {
     const session = await getServerSession(authOptions);
 
@@ -99,10 +139,10 @@ export async function copyProject(
         return { error: "專案代碼為必填" };
     }
 
-    // Code Prefix format validation
+    // Code Prefix format validation (uppercase, alphanumeric, hyphen allowed)
     const normalizedPrefix = newCodePrefix.trim().toUpperCase();
-    if (!/^[A-Z0-9]+$/.test(normalizedPrefix)) {
-        return { error: "專案代碼僅可使用大寫英文字母與數字" };
+    if (!/^[A-Z0-9]+(-[A-Z0-9]+)*$/.test(normalizedPrefix)) {
+        return { error: "專案代碼僅可使用大寫英文字母、數字與連字號(-)" };
     }
 
     try {
@@ -145,7 +185,8 @@ export async function copyProject(
             data: {
                 title: newTitle.trim(),
                 description: newDescription?.trim() || sourceProject.description,
-                codePrefix: normalizedPrefix
+                codePrefix: normalizedPrefix,
+                categoryId: newCategoryId ?? sourceProject.categoryId
             }
         });
 

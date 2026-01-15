@@ -4,6 +4,15 @@ import { useFormStatus, useFormState } from "react-dom";
 import { createProject, ProjectState } from "@/actions/project";
 import { useEffect, useState } from "react";
 
+interface Category {
+    id: number;
+    name: string;
+}
+
+interface CreateProjectFormProps {
+    categories: Category[];
+}
+
 const initialState: ProjectState = {
     message: "",
     error: "",
@@ -18,14 +27,13 @@ function SubmitButton() {
     );
 }
 
-export default function CreateProjectForm() {
+export default function CreateProjectForm({ categories }: CreateProjectFormProps) {
     const [state, formAction] = useFormState(createProject, initialState);
     const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
         if (state.message) {
             setIsOpen(false);
-            // We could also reset the form here if we had a ref to it
         }
     }, [state.message]);
 
@@ -74,17 +82,31 @@ export default function CreateProjectForm() {
                 </div>
 
                 <div className="flex-col gap-sm">
-                    <label htmlFor="codePrefix" style={{ fontSize: "0.9rem", fontWeight: 500 }}>代碼前綴 (大寫，項目編號用)</label>
+                    <label htmlFor="codePrefix" style={{ fontSize: "0.9rem", fontWeight: 500 }}>代碼前綴 (大寫英文、數字、連字號)</label>
                     <input
                         id="codePrefix"
                         name="codePrefix"
                         type="text"
                         required
-                        pattern="[A-Z0-9]+"
-                        placeholder="例如：WEB, Q4"
+                        pattern="[A-Z0-9]+(-[A-Z0-9]+)*"
+                        placeholder="例如：WEB, Q4, DAREN-SI"
                         className="input-field"
                         style={{ padding: "0.75rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border)" }}
                     />
+                </div>
+
+                <div className="flex-col gap-sm">
+                    <label htmlFor="categoryId" style={{ fontSize: "0.9rem", fontWeight: 500 }}>分區</label>
+                    <select
+                        id="categoryId"
+                        name="categoryId"
+                        style={{ padding: "0.75rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border)" }}
+                    >
+                        <option value="">未分類</option>
+                        {categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="flex-col gap-sm">
@@ -105,3 +127,4 @@ export default function CreateProjectForm() {
         </div>
     );
 }
+

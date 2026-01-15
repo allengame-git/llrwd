@@ -24,6 +24,7 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
         content: diff.content?.old ?? snapshot.content,
         attachments: diff.attachments?.old ?? snapshot.attachments,
         relatedItems: diff.relatedItems?.old ?? snapshot.relatedItems,
+        references: diff.references?.old ?? snapshot.references,
     } : null;
 
     // Helper to render attachments as clickable links
@@ -78,6 +79,8 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
             const isHtmlContent = key === 'content';
             // For 'relatedItems' field, render as card list
             const isRelatedItems = key === 'relatedItems';
+            // For 'references' field, render as file reference list
+            const isReferences = key === 'references';
 
             // Helper to render related items list with full content
             const renderRelatedItemsList = (items: { id: number; fullId: string; title?: string; description?: string }[] | null) => {
@@ -120,10 +123,47 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                 );
             };
 
+            // Helper to render references list
+            const renderReferencesList = (refs: { fileId: number; dataCode: string; dataName: string; dataYear: number; author: string; citation?: string }[] | null) => {
+                if (!refs || refs.length === 0) {
+                    return <em style={{ color: 'var(--color-text-muted)' }}>無參考文獻</em>;
+                }
+                return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {refs.map((ref) => (
+                            <div key={ref.fileId} style={{
+                                padding: '0.75rem',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '6px',
+                                background: 'rgba(255,255,255,0.3)'
+                            }}>
+                                <div style={{ marginBottom: '0.25rem' }}>
+                                    <div style={{ fontWeight: 'bold' }}>{ref.dataName} ({ref.dataYear})</div>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.1rem' }}>
+                                        作者: {ref.author}
+                                    </div>
+                                </div>
+                                {ref.citation && (
+                                    <div style={{
+                                        fontSize: '0.85rem',
+                                        color: 'var(--color-text-muted)',
+                                        paddingLeft: '0.5rem',
+                                        borderLeft: '2px solid var(--color-border)',
+                                        marginTop: '0.25rem'
+                                    }}>
+                                        {ref.citation}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
+
             return (
                 <div key={key} style={{ marginBottom: '1.5rem', borderLeft: '3px solid var(--color-info)', paddingLeft: '1rem' }}>
                     <div style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                        {key === 'relatedItems' ? '關聯項目' : key === 'content' ? '內容' : key === 'title' ? '標題' : key === 'attachments' ? '附件' : key}
+                        {key === 'relatedItems' ? '關聯項目' : key === 'references' ? '參考文獻' : key === 'content' ? '內容' : key === 'title' ? '標題' : key === 'attachments' ? '附件' : key}
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div style={{ background: 'rgba(255,0,0,0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,0,0,0.1)' }}>
@@ -136,6 +176,8 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                                 />
                             ) : isRelatedItems ? (
                                 renderRelatedItemsList(value.old)
+                            ) : isReferences ? (
+                                renderReferencesList(value.old)
                             ) : (
                                 <pre style={{ margin: 0, fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                                     {typeof value.old === 'object' ? JSON.stringify(value.old, null, 2) : String(value.old ?? '')}
@@ -152,6 +194,8 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                                 />
                             ) : isRelatedItems ? (
                                 renderRelatedItemsList(value.new)
+                            ) : isReferences ? (
+                                renderReferencesList(value.new)
                             ) : (
                                 <pre style={{ margin: 0, fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                                     {typeof value.new === 'object' ? JSON.stringify(value.new, null, 2) : String(value.new ?? '')}

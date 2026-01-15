@@ -40,25 +40,141 @@ export default async function ApprovalPage() {
     const hasNoRequests = requests.length === 0 && fileRequests.length === 0 && qcApprovals.length === 0;
 
     return (
-        <div className="container" style={{ paddingBottom: "4rem" }}>
-            <h1 style={{ marginBottom: "2rem" }}>Approval Dashboard</h1>
+        <div style={{ padding: "2rem", maxWidth: "1400px", margin: "0 auto" }}>
+            {/* Header */}
+            <div style={{
+                marginBottom: "2rem",
+                paddingBottom: "1.5rem",
+                borderBottom: "1px solid var(--color-border)"
+            }}>
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                    marginBottom: "0.5rem"
+                }}>
+                    <div style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "8px",
+                        backgroundColor: "var(--color-primary-soft)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                    }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2">
+                            <path d="M9 11l3 3L22 4" />
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                        </svg>
+                    </div>
+                    <h1 style={{
+                        fontSize: "1.5rem",
+                        fontWeight: 700,
+                        color: "var(--color-text-main)",
+                        margin: 0
+                    }}>
+                        審核中心
+                    </h1>
+                </div>
+                <p style={{
+                    color: "var(--color-text-muted)",
+                    margin: 0,
+                    fontSize: "0.9rem",
+                    paddingLeft: "52px"
+                }}>
+                    審核待處理的變更申請與品質文件
+                </p>
+            </div>
 
             {/* Item Change Requests */}
             {requests.length > 0 && (
-                <div style={{ marginBottom: "3rem" }}>
-                    <h2 style={{ fontSize: "1.2rem", marginBottom: "1rem", color: "var(--color-text-secondary)" }}>
-                        📋 項目變更申請 ({requests.length})
-                    </h2>
+                <div style={{ marginBottom: "2.5rem" }}>
+                    <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem",
+                        marginBottom: "1rem"
+                    }}>
+                        <div style={{
+                            width: "32px",
+                            height: "32px",
+                            borderRadius: "6px",
+                            backgroundColor: "rgba(139, 92, 246, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center"
+                        }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                                <line x1="16" y1="13" x2="8" y2="13" />
+                                <line x1="16" y1="17" x2="8" y2="17" />
+                            </svg>
+                        </div>
+                        <h2 style={{
+                            fontSize: "1.1rem",
+                            fontWeight: 600,
+                            color: "var(--color-text-main)",
+                            margin: 0
+                        }}>
+                            項目變更申請
+                        </h2>
+                        <span style={{
+                            padding: "0.2rem 0.6rem",
+                            backgroundColor: "rgba(139, 92, 246, 0.1)",
+                            color: "#8b5cf6",
+                            borderRadius: "4px",
+                            fontSize: "0.75rem",
+                            fontWeight: 600
+                        }}>
+                            {requests.length}
+                        </span>
+                    </div>
                     <ApprovalList requests={requests} currentUsername={session.user.username} currentUserRole={session.user.role} />
                 </div>
             )}
 
             {/* DataFile Change Requests */}
             {fileRequests.length > 0 && (
-                <div style={{ marginBottom: "3rem" }}>
-                    <h2 style={{ fontSize: "1.2rem", marginBottom: "1rem", color: "var(--color-text-secondary)" }}>
-                        📁 檔案變更申請 ({fileRequests.length})
-                    </h2>
+                <div style={{ marginBottom: "2.5rem" }}>
+                    <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem",
+                        marginBottom: "1rem"
+                    }}>
+                        <div style={{
+                            width: "32px",
+                            height: "32px",
+                            borderRadius: "6px",
+                            backgroundColor: "rgba(14, 165, 233, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center"
+                        }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                            </svg>
+                        </div>
+                        <h2 style={{
+                            fontSize: "1.1rem",
+                            fontWeight: 600,
+                            color: "var(--color-text-main)",
+                            margin: 0
+                        }}>
+                            檔案變更申請
+                        </h2>
+                        <span style={{
+                            padding: "0.2rem 0.6rem",
+                            backgroundColor: "rgba(14, 165, 233, 0.1)",
+                            color: "#0ea5e9",
+                            borderRadius: "4px",
+                            fontSize: "0.75rem",
+                            fontWeight: 600
+                        }}>
+                            {fileRequests.length}
+                        </span>
+                    </div>
                     <DataFileApprovalList requests={fileRequests} currentUsername={session.user.username} currentUserRole={session.user.role} />
                 </div>
             )}
@@ -75,13 +191,26 @@ export default async function ApprovalPage() {
             )}
 
             {hasNoRequests && (
-                <div style={{
+                <div className="glass" style={{
                     textAlign: 'center',
                     padding: '4rem 2rem',
-                    color: 'var(--color-text-muted)'
+                    color: 'var(--color-text-muted)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px dashed var(--color-border)'
                 }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
-                    <p>目前沒有待審核的申請</p>
+                    <svg
+                        width="48"
+                        height="48"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        style={{ marginBottom: '1rem', opacity: 0.4 }}
+                    >
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                    <p style={{ margin: 0, fontSize: '0.95rem' }}>目前沒有待審核的申請</p>
                 </div>
             )}
         </div>

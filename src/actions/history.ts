@@ -10,6 +10,7 @@ export interface ItemSnapshot {
     content: string | null;
     attachments: string | null;
     relatedItems: { id: number; fullId: string; title?: string; description?: string | null }[];
+    references?: { fileId: number; dataCode: string; dataName: string; dataYear: number; author: string; citation?: string | null }[];
 }
 
 /**
@@ -35,6 +36,14 @@ function computeDiff(oldData: ItemSnapshot, newData: ItemSnapshot) {
 
     if (JSON.stringify(oldRelations) !== JSON.stringify(newRelations)) {
         diff['relatedItems'] = { old: oldRelations, new: newRelations };
+    }
+
+    // Compare references (arrays)
+    const oldRefs = [...(oldData.references || [])].sort((a, b) => a.fileId - b.fileId);
+    const newRefs = [...(newData.references || [])].sort((a, b) => a.fileId - b.fileId);
+
+    if (JSON.stringify(oldRefs) !== JSON.stringify(newRefs)) {
+        diff['references'] = { old: oldRefs, new: newRefs };
     }
 
     return Object.keys(diff).length > 0 ? diff : null;

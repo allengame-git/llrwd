@@ -1,18 +1,95 @@
-# 技術文件 - 專案項目資訊管理系統 (tech.md)
+# 技術文件 - 低放射性廢棄物處置管理系統 (tech.md)
 
->> 最後更新: 2026-01-09
+>> 最後更新: 2026-01-15
 
 ## 專案資訊
 
-| 項目 | 說明 |
-| :--- | :--- |
-| **專案名稱** | 專案項目資訊管理系統 (RMS) |
-| **技術棧** | Next.js 14, TypeScript, Prisma, SQLite, NextAuth.js |
-| **樣式方案** | Vanilla CSS + CSS Variables |
-| **編輯器** | Tiptap (ProseMirror-based) |
-| **部署方案** | Docker + Nginx (HTTPS) |
+| 項目 | 說明 | 版本 |
+| :--- | :--- | :--- |
+| **專案名稱** | 低放射性廢棄物處置管理系統 (LLRWD-RMS) | v1.9.2 |
+| **技術棧** | Next.js, TypeScript, Prisma, PostgreSQL, NextAuth.js | - |
+| **樣式方案** | Vanilla CSS + CSS Variables | - |
+| **編輯器** | Tiptap (ProseMirror-based) | ^3.14.0 |
+| **PDF 生成** | pdf-lib + Puppeteer (高真度多頁渲染) | pdf-lib ^1.17.1 |
+| **部署方案** | Docker + Nginx / Vercel + Neon PostgreSQL | - |
 
 ---
+
+## 套件依賴完整清單
+
+> ⚠️ 以下為 `package.json` 中所有套件的詳細說明，確保新環境可順利安裝。
+
+### 生產環境套件 (dependencies)
+
+| 套件名稱 | 版本 | 用途說明 |
+| :--- | :--- | :--- |
+| `next` | 14.2.35 | Next.js 框架核心 |
+| `react` | ^18 | React UI 框架 |
+| `react-dom` | ^18 | React DOM 渲染 |
+| `@prisma/client` | 5.22.0 | Prisma 資料庫客戶端 |
+| `next-auth` | ^4.24.13 | 使用者認證系統 |
+| `bcryptjs` | ^3.0.3 | 密碼雜湊加密 |
+| `@tiptap/react` | ^3.14.0 | Tiptap 富文本編輯器 React 綁定 |
+| `@tiptap/starter-kit` | ^3.14.0 | Tiptap 基礎功能套件 |
+| `@tiptap/extension-image` | ^3.14.0 | 圖片插入功能 |
+| `@tiptap/extension-link` | ^3.14.0 | 超連結功能 |
+| `@tiptap/extension-table` | ^3.14.0 | 表格主功能 |
+| `@tiptap/extension-table-cell` | ^3.14.0 | 表格儲存格 |
+| `@tiptap/extension-table-header` | ^3.14.0 | 表格標題列 |
+| `@tiptap/extension-table-row` | ^3.14.0 | 表格行 |
+| `@tiptap/extension-text-align` | ^3.15.3 | 文字對齊功能 |
+| `tiptap-extension-resize-image` | ^1.3.2 | 圖片縮放功能 |
+| `pdf-lib` | ^1.17.1 | PDF 生成/修改函式庫 |
+| `@pdf-lib/fontkit` | ^1.1.1 | 自定義字型嵌入 (中文支援) |
+| `pdfkit` | ^0.17.2 | (備用) PDF 生成函式庫 |
+| `puppeteer` | ^24.34.0 | 無頭瀏覽器 (HTML 轉 PDF/截圖) |
+| `adm-zip` | ^0.5.16 | ZIP 檔案解壓縮 (備份還原) |
+| `archiver` | ^7.0.1 | ZIP 檔案壓縮 (系統備份) |
+| `clsx` | ^2.1.1 | CSS class 名稱條件組合 |
+| `zustand` | ^5.0.9 | 輕量級前端狀態管理 |
+| `react-easy-crop` | ^5.5.6 | 圖片裁切功能 (簽名上傳) |
+
+### 開發環境套件 (devDependencies)
+
+| 套件名稱 | 版本 | 用途說明 |
+| :--- | :--- | :--- |
+| `prisma` | 5.22.0 | Prisma CLI 開發工具 |
+| `typescript` | ^5 | TypeScript 編譯器 |
+| `eslint` | ^8 | 程式碼品質檢查 |
+| `eslint-config-next` | 14.2.35 | Next.js ESLint 設定 |
+| `vitest` | ^4.0.17 | 單元測試框架 |
+| `@types/node` | ^20 | Node.js 型別定義 |
+| `@types/react` | ^18 | React 型別定義 |
+| `@types/react-dom` | ^18 | React DOM 型別定義 |
+| `@types/bcryptjs` | ^2.4.6 | bcryptjs 型別定義 |
+| `@types/pdfkit` | ^0.17.4 | pdfkit 型別定義 |
+| `@types/adm-zip` | ^0.5.7 | adm-zip 型別定義 |
+| `@types/archiver` | ^7.0.0 | archiver 型別定義 |
+
+### 安裝指令
+
+```bash
+# 安裝所有套件
+npm install
+
+# 若需更新套件
+npm update
+
+# 若需安裝特定套件
+npm install <package-name>
+```
+
+### Puppeteer 特殊安裝說明
+
+Puppeteer 會自動下載 Chromium 瀏覽器 (~200MB)，在某些環境可能需要額外設定：
+
+```bash
+# 若需跳過 Chromium 下載 (使用系統 Chrome)
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# 設定執行路徑
+export PUPPETEER_EXECUTABLE_PATH=/path/to/chrome
+```
 
 ## 系統架構
 
@@ -734,35 +811,48 @@ if (user?.signaturePath) {
 
 **PDF 生成核心套件**:
 
-- `pdf-lib`: 純 JavaScript PDF 生成/修改函式庫
-- `@pdf-lib/fontkit`: 字型嵌入支援
-- `puppeteer`: HTML 截圖渲染
+- `pdf-lib`: 純 JavaScript PDF 生成/修改函式庫，用於建立主文件與分頁合併。
+- `@pdf-lib/fontkit`: 提供自定義字型嵌入支援（如 Arial Unicode）。
+- `puppeteer`: 提供無頭瀏覽器環境，用於將複雜的 HTML (包含表格、圖片、時間軸) 渲染為 PDF 或圖片。
 
 **檔案結構**:
 
 ```text
 src/lib/
-├── pdf-generator.ts      # PDF 生成 (pdf-lib)
-├── pdf-signature.ts      # 簽名嵌入
-└── html-renderer.ts      # HTML 截圖 (Puppeteer)
+├── pdf-generator.ts      # PDF 生成核心與分頁合併邏輯
+├── pdf-signature.ts      # 簽名圖片嵌入邏輯 (pdf-lib)
+├── html-renderer.ts      # HTML 轉 PDF/圖片實作 (Puppeteer)
 ```
 
-**HTML 截圖流程**:
+**多頁 PDF 生成流程 (2026/01 優化)**:
+
+為了解決長文本截斷問題，系統從「截圖嵌入」優化為「直接生成 PDF 並合併」：
+
+1. **HTML 準備**: 根據歷史快照內容生成完整的 HTML 模板，包含 CSS 樣式。
+2. **Puppeteer 渲染**: 使用 `page.pdf({ format: 'A4' })` 將 HTML 直接印製成多頁 PDF 緩衝區。
+3. **pdf-lib 合併**:
+   - 載入主文件 (QC 單) 與產生的歷史 PDF。
+   - 使用 `copyPages` 將歷史 PDF 的所有頁面複製並追加至主文件末尾。
+4. **數位簽章**: 由 `pdf-signature.ts` 在指定頁面的固定座標（QC/PM 簽核區）嵌入簽名圖片。
+
+**HTML 轉 PDF 實作**:
 
 ```typescript
-import puppeteer from 'puppeteer';
-
-export async function renderHtmlToImage(htmlContent: string, width: number): Promise<Buffer> {
-    const browser = await puppeteer.launch({ headless: true });
+// src/lib/html-renderer.ts
+export async function renderHtmlToPdf(html: string): Promise<Buffer> {
+    const browser = await puppeteer.launch({ 
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    });
     const page = await browser.newPage();
-    
-    await page.setViewport({ width, height: 800, deviceScaleFactor: 2 });
-    await page.setContent(wrapWithStyles(htmlContent));
-    
-    const screenshot = await page.screenshot({ type: 'png' });
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdf = await page.pdf({
+        format: 'A4',
+        margin: { top: '20mm', right: '20mm', bottom: '20mm', left: '20mm' },
+        printBackground: true
+    });
     await browser.close();
-    
-    return screenshot;
+    return Buffer.from(pdf);
 }
 ```
 
@@ -794,6 +884,58 @@ src/
 - **觸發時機**: 項目變更申請 (Create/Update/Delete) 被核准 (APPROVED) 時
 - **生成方式**: 後端非同步生成 PDF，不阻塞主要流程 (但需確保生成成功後更新 DB)
 - **儲存策略**: 產生靜態檔案至 `/public/iso_doc/`，資料庫儲存相對路徑
+
+---
+
+## Phase 19: 富文本編輯器強化 (v1.9.0)
+
+### 19.1 巢狀編號實作 (CSS Counters)
+
+為了讓有序列表 (`ol`) 顯示如 `1.1`, `1.2.1` 的巢狀格式，我們使用了 CSS Counters 屬性：
+
+- `counter-reset: item`: 在 `ol` 重置計數。
+- `counter-increment: item`: 在每個 `li` 遞增計數。
+- `content: counters(item, ".") ". "`: 在 `::before` 偽元素中遞迴顯示計數器。
+
+**樣式定義 (globals.css)**:
+
+```css
+.rich-text-content ol {
+  list-style-type: none;
+  counter-reset: item;
+  padding-left: 2.5rem;
+}
+.rich-text-content ol > li::before {
+  content: counters(item, ".") ". ";
+  position: absolute;
+  left: -3rem;
+  width: 2.8rem;
+  text-align: right;
+  white-space: nowrap;
+}
+```
+
+### 19.2 自定義 Indent 擴充套件
+
+為了支援段落縮排與對齊，我們實作了 `src/components/editor/extensions/Indent.ts`：
+
+- **屬性**: `margin-left` 儲存於 `indent` Attribute。
+- **快捷鍵**:
+  - `Tab`: 呼叫 `indent` 指令。
+  - `Shift+Tab`: 呼叫 `outdent` 指令。
+- **列表處理**: 當游標在列表項目 (`listItem`) 內時，會優先執行 Tiptap 內建的 `sinkListItem`/`liftListItem` 以保持結構正確。
+
+### 19.3 全域富文本樣式 (.rich-text-content)
+
+為解決樣式不一致問題，所有富文本渲染區塊皆統一使用 `.rich-text-content` 類別，並定義於 `app/globals.css`。
+
+**包含樣式**:
+
+- 表格寬度與邊框。
+- 圖片圓角與最大寬度。
+- 區塊引言 (blockquote)。
+- 列表與巢狀編號。
+- 段落文字對齊 (TextAlign 支援)。
 
 ### 13. S.O.P. & Structure
 
@@ -1070,3 +1212,23 @@ if (user.failedLoginAttempts > 0) {
 - 狀態欄位：正常 (✓) / 已鎖定 (🔒) / 失敗 N 次 (⚠️)
 - 解鎖按鈕 (鎖定使用者才顯示)
 - 鎖定帳號列紅色高亮
+
+---
+
+## Phase 20: 品質文件 PDF 歷史快照功能恢復 (v1.9.1)
+
+針對品質文件 PDF 第二頁的「歷史版本快照」，系統恢復使用 Puppeteer 截圖方式處理。
+
+### 技術細節
+
+- **截圖函式**: 呼叫 `src/lib/html-renderer.ts` 中的 `renderHtmlToImage`。
+- **渲染內容**:
+  - 從 `ItemHistory.snapshot` 解析出 `content` (HTML)。
+  - 若無內容則預設顯式為 `<p>(無內容)</p>`。
+- **PDF 嵌入**:
+  - 使用 `pdf-lib` 的 `embedPng` 功能。
+  - 將圖片縮放以符合 A4 頁面寬度 (扣除邊距)。
+  - 限制最大高度，避免圖片超出頁面範圍。
+- **降級機制 (Fallback)**:
+  - 使用 `try-catch` 包裹截圖流程。
+  - 若截圖失敗，自動執行 `generateHistorySummaryPages` 生成純文字摘要 PDF 頁面，確保流程不中斷。

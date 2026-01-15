@@ -39,27 +39,27 @@ export async function POST(request: NextRequest) {
 
         // Get file extension
         const originalName = file.name;
-        const ext = path.extname(originalName);
 
-        // Create unique filename - use dataCode if provided, otherwise use timestamp-based name
+        // Sanitize original filename - keep the name but remove dangerous characters
+        const sanitizedName = originalName.replace(/[<>:"/\\|?*]/g, '_');
+
+        // Create unique subdirectory with timestamp to avoid filename conflicts
         const timestamp = Date.now();
-        const safePrefix = dataCode?.trim()
-            ? dataCode.replace(/[^a-zA-Z0-9-_]/g, '_')
-            : `file_${timestamp.toString(36)}`;
-        const newFileName = `${safePrefix}_${timestamp}${ext}`;
+        const subDir = timestamp.toString(36);
 
-        // Create year directory if not exists
-        const yearDir = path.join(process.cwd(), 'public', 'uploads', 'datafiles', dataYear);
+        // Create year/subdir directory if not exists
+        const yearDir = path.join(process.cwd(), 'public', 'uploads', 'datafiles', dataYear, subDir);
         await mkdir(yearDir, { recursive: true });
 
-        // Save file
-        const filePath = path.join(yearDir, newFileName);
+        // Save file with original (sanitized) name
+        const filePath = path.join(yearDir, sanitizedName);
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
         await writeFile(filePath, buffer);
 
         // Return relative path for storage in DB
-        const relativePath = `/uploads/datafiles/${dataYear}/${newFileName}`;
+        const relativePath = `/uploads/datafiles/${dataYear}/${subDir}/${sanitizedName}`;
+
 
         return NextResponse.json({
             success: true,

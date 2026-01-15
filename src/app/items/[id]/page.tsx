@@ -40,6 +40,21 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                 },
                 orderBy: { createdAt: 'asc' }
             },
+            references: {
+                include: {
+                    file: {
+                        select: {
+                            id: true,
+                            dataCode: true,
+                            dataName: true,
+                            dataYear: true,
+                            author: true,
+                            fileName: true
+                        }
+                    }
+                },
+                orderBy: { createdAt: 'asc' }
+            },
             history: {
                 orderBy: { createdAt: 'desc' },
                 take: 10,
@@ -184,7 +199,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                         return (
                             <div className="glass" style={{ padding: "2rem", borderRadius: "var(--radius-lg)", marginTop: "2rem" }}>
                                 <h3 style={{ marginBottom: "1rem", fontSize: "1.2rem", display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    📎 關聯項目
+                                    關聯項目
                                     <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: 'var(--color-text-muted)' }}>
                                         ({relatedItems.length})
                                     </span>
@@ -199,7 +214,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                                             paddingBottom: "0.25rem",
                                             borderBottom: "1px solid var(--color-border)"
                                         }}>
-                                            📁 {projectTitle}
+                                            {projectTitle}
                                         </div>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                                             {grouped[projectTitle].map((related: RelatedItemType) => (
@@ -278,6 +293,81 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                                     </a>
                                 ))}
                             </div>
+                        </div>
+                    )}
+
+                    {/* References Section */}
+                    {item.references && item.references.length > 0 && (
+                        <div className="glass" style={{ padding: "2rem", borderRadius: "var(--radius-lg)", marginTop: "2rem" }}>
+                            <h3 style={{ marginBottom: "1rem", fontSize: "1.2rem", display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                參考文獻
+                                <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: 'var(--color-text-muted)' }}>
+                                    ({item.references.length})
+                                </span>
+                            </h3>
+                            {(() => {
+                                // Group by year
+                                type RefType = { fileId: number; citation: string | null; file: { id: number; dataCode: string; dataName: string; dataYear: number; author: string } };
+                                const grouped = item.references.reduce((acc: Record<number, RefType[]>, ref: RefType) => {
+                                    const year = ref.file.dataYear;
+                                    if (!acc[year]) acc[year] = [];
+                                    acc[year].push(ref);
+                                    return acc;
+                                }, {} as Record<number, RefType[]>);
+
+                                const sortedYears = Object.keys(grouped).map(Number).sort((a, b) => b - a);
+
+                                return sortedYears.map((year) => (
+                                    <div key={year} style={{ marginBottom: "1.5rem" }}>
+                                        <div style={{
+                                            fontSize: "0.85rem",
+                                            fontWeight: 600,
+                                            color: "var(--color-text-muted)",
+                                            marginBottom: "0.5rem",
+                                            paddingBottom: "0.25rem",
+                                            borderBottom: "1px solid var(--color-border)"
+                                        }}>
+                                            {year}
+                                        </div>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                                            {grouped[year].map((ref: RefType) => (
+                                                <a
+                                                    key={ref.file.id}
+                                                    href={`/datafiles/${ref.file.id}`}
+                                                    style={{
+                                                        display: "block",
+                                                        padding: "1rem",
+                                                        backgroundColor: "var(--color-bg-elevated)",
+                                                        borderRadius: "var(--radius-md)",
+                                                        border: "1px solid var(--color-border)",
+                                                        textDecoration: "none",
+                                                        color: "inherit",
+                                                        transition: "all 0.2s"
+                                                    }}
+                                                >
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: "bold" }}>{ref.file.dataName}</div>
+                                                        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                                                            作者: {ref.file.author}
+                                                        </div>
+                                                    </div>
+                                                    {ref.citation && (
+                                                        <div style={{
+                                                            marginTop: '0.5rem',
+                                                            fontSize: '0.85rem',
+                                                            color: 'var(--color-text-muted)',
+                                                            paddingLeft: '0.5rem',
+                                                            borderLeft: '2px solid var(--color-border)'
+                                                        }}>
+                                                            引用說明: {ref.citation}
+                                                        </div>
+                                                    )}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ));
+                            })()}
                         </div>
                     )}
 

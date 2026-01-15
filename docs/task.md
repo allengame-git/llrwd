@@ -1,6 +1,6 @@
-# 專案項目資訊管理系統 - 開發進度 (task.md)
+# 低放射性廢棄物處置管理系統 - 開發進度 (task.md)
 
->> 最後更新: 2026-01-12
+>> 最後更新: 2026-01-15
 
 ## 進度總覽
 
@@ -18,6 +18,14 @@
 | Phase 10 | 品質文件 PDF 優化 | ✅ 完成 |
 | Phase 11 | 變更申請退回優化 | ✅ 完成 |
 | Phase 12 | ISO 文件頁面優化 | ✅ 完成 |
+| Phase 16 | QC/PM 複審流程 | ✅ 完成 |
+| Phase 17 | 專案複製功能 | ✅ 完成 |
+| Phase 18 | PDF-lib 重構與 Vercel 部署 | ✅ 完成 |
+| Phase 19 | 富文本編輯器強化 (巢狀編號、縮排) | ✅ 完成 |
+| Phase 20 | 品質文件 PDF 歷史快照功能恢復 (截圖方式) | ✅ 完成 |
+| Phase 21 | 品質文件 PDF 歷史快照強化 (時間軸與 Diff) | ✅ 完成 |
+| Phase 22 | PDF 截斷修復 (支援多頁分頁) | ✅ 完成 |
+| Phase 23 | 專案頁面中文化與 UI 優化 | ✅ 完成 |
 
 ---
 
@@ -310,3 +318,143 @@
 - [x] 進度條與狀態顯示 (Progress Bar)
 - [x] 備份檔案完整性檢查
 - [x] 復原完成後自動登出機制
+
+---
+
+## Phase 16: QC/PM 複審流程 (v1.8.0) ✅
+
+### Phase 16.1: 複審機制 ✅
+
+- [x] QCDocumentApproval 模型新增 `revisionCount` 欄位
+- [x] 新增 `REVISION_REQUIRED` 狀態 (要求修訂)
+- [x] QC/PM 可選擇「核准」或「要求修訂」
+- [x] 修訂後自動變更狀態為 `PENDING_QC` 或 `PENDING_PM`
+
+### Phase 16.2: UI 整合 ✅
+
+- [x] 審核頁面新增「要求修訂」按鈕
+- [x] 品質文件狀態顯示修訂次數
+- [x] 歷史詳情頁顯示完整複審歷程 (Timeline)
+- [x] `ReviewProcessTimeline` 元件支援 revisions 陣列
+
+---
+
+## Phase 17: 專案複製功能 (v1.8.0) ✅
+
+### Phase 17.1: 後端實作 ✅
+
+- [x] Server Action: `duplicateProject(projectId, newTitle, newPrefix)`
+- [x] 遞迴複製項目結構 (深層複製)
+- [x] 保持 fullId 自動重新計算
+- [x] 選擇性複製項目內容與附件
+
+### Phase 17.2: 前端整合 ✅
+
+- [x] 專案卡片新增「複製」按鈕
+- [x] 複製對話框 (輸入新專案名稱與編碼)
+- [x] 複製完成後自動跳轉至新專案
+
+---
+
+## Phase 18: PDF-lib 重構與 Vercel 部署 (v1.8.0) ✅
+
+### Phase 18.1: PDF 生成重構 ✅
+
+- [x] 移除 Puppeteer 依賴 (降低套件大小)
+- [x] 改用 pdf-lib 純文字渲染歷史摘要
+- [x] `generateHistorySummaryPages` 直接生成 PDF 頁面
+- [x] 維持簽名嵌入功能 (`embedSignatureInPDF`)
+
+### Phase 18.2: Vercel 部署支援 ✅
+
+- [x] 動態路由加入 `force-dynamic` 防止靜態預渲染
+- [x] 移除 API Route 中的 fs 寫入操作 (Serverless 相容)
+- [x] 建立 Neon PostgreSQL 連線指南
+- [x] 撰寫 `docs/freespace_deployment.md` 部署文件
+
+---
+
+## Phase 19: 富文本編輯器強化 (v1.9.0) ✅
+
+### Phase 19.1: 巢狀編號與列表 ✅
+
+- [x] 實作有序列表 (ol) 的巢狀編號功能 (1., 1.1, 1.2.1)
+- [x] 使用 CSS Counters 實現動態編號渲染
+- [x] 修復編號版面跑位 (跨行顯示問題)
+
+### Phase 19.2: 段落縮排與對齊 ✅
+
+- [x] 實作自定義 `Indent` Tiptap 擴充套件
+- [x] 整合 Tab (增加縮排) 與 Shift+Tab (減少縮排) 快捷鍵
+- [x] 優化縮排邏輯：列表項目使用 `sinkListItem`/`liftListItem`，一般段落使用 `margin-left`
+
+### Phase 19.3: 全域樣式整合 ✅
+
+- [x] 提取富文本樣式至 `globals.css` 中的 `.rich-text-content`
+- [x] 確保「項目詳情」、「審核清單」、「歷史版本」、「退回申請」樣式一致
+- [x] 整合 `TextAlign` 擴充套件並配置文字對齊樣式
+
+---
+
+## Phase 20: 品質文件 PDF 歷史快照功能恢復 (v1.9.1) ✅
+
+### Phase 20.1: 功能恢復 ✅
+
+- [x] 將品質文件第二頁的歷史快照改回使用 Puppeteer 截圖
+- [x] 整合 `renderHtmlToImage` 確保富文本排版完整性
+- [x] 實作截圖失敗時的文字摘要降級機制 (Fallback)
+
+---
+
+## Phase 21: 品質文件 PDF 歷史快照強化 (v1.9.2) ✅
+
+### Phase 21.1: HTML 模板與樣式強化 ✅
+
+- [x] 在 `pdf-generator.ts` 構建包含時間軸與 Diff 的 HTML 模板
+- [x] 注入 `.rich-text-content` 與時間軸專用 CSS
+- [x] 支援 `history.reviewChain` 渲染多輪審核紀錄
+- [x] 支援 `history.diff` 渲染變更前後對照卡片
+- [x] 整合至 `generateQCDocument` 並驗證截圖完整性
+
+---
+
+## Phase 22: PDF 截斷修復 (支援多頁分頁) ✅
+
+### Phase 22.1: 改用 Puppeteer PDF 生成 ✅
+
+- [x] 在 `html-renderer.ts` 實作 `renderHtmlToPdf`
+- [x] 在 `pdf-generator.ts` 改用 PDF 合併模式
+- [x] 移除 1000px 高度限制，支援自然分頁
+- [x] 保持文字清晰度與可搜尋性
+- [x] 修復通知頁面「刪除已讀」按鈕閃退問題 (改用 custom ConfirmDialog)
+
+---
+
+## Phase 23: 專案頁面中文化與 UI 優化 ✅
+
+### Phase 23.1: 專案詳情頁面中文化 ✅
+
+- [x] `/projects/[id]` 頁面返回連結中文化 (返回專案列表)
+- [x] 「Items」→「項目列表」
+- [x] 空狀態訊息中文化 (尚無項目資料)
+
+### Phase 23.2: 移除 Emoji 圖示 ✅
+
+- [x] `ProjectSearchBar.tsx` - 🔍 改為 SVG 搜尋圖示
+- [x] `SearchResultList.tsx` - 🔍 空狀態改為 SVG
+- [x] `CreateItemForm.tsx` - ✕ 改為 SVG X 圖示，加入動畫效果
+- [x] `RelatedItemsManager.tsx` - 📎 改為 SVG 連結圖示
+- [x] `ReferencesManager.tsx` - 📚📄🔍✓ 改為 SVG
+
+### Phase 23.3: 彈出視窗 UI 優化 ✅
+
+- [x] 新增項目表單優化 (標題區域、欄位樣式)
+- [x] 加入進場動畫 (fadeIn, slideUp)
+- [x] 關閉按鈕 hover 效果
+- [x] 提交按鈕加入圖示與 loading 狀態
+
+### Phase 23.4: 文件更新 ✅
+
+- [x] 更新 `README.md` - 加入完整套件依賴說明
+- [x] 更新 `docs/tech.md` - 加入套件依賴完整清單
+- [x] 更新 `docs/task.md` - 加入 Phase 23

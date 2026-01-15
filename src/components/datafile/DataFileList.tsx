@@ -24,6 +24,50 @@ type SortKey = 'dataName' | 'dataCode' | 'dataYear' | 'author' | 'fileSize' | 'c
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'card' | 'list';
 
+const FileTypeIcon = ({ mimeType }: { mimeType: string }) => {
+    const getLabel = () => {
+        if (mimeType.startsWith('image/')) return 'IMG';
+        if (mimeType.includes('pdf')) return 'PDF';
+        if (mimeType.includes('word') || mimeType.includes('document')) return 'DOC';
+        if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'XLS';
+        if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'PPT';
+        if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('archive')) return 'ZIP';
+        if (mimeType.includes('video')) return 'VID';
+        if (mimeType.includes('audio')) return 'AUD';
+        return 'FILE';
+    };
+
+    const getColor = () => {
+        if (mimeType.startsWith('image/')) return '#10b981';
+        if (mimeType.includes('pdf')) return '#ef4444';
+        if (mimeType.includes('word') || mimeType.includes('document')) return '#3b82f6';
+        if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '#22c55e';
+        if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return '#f97316';
+        if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('archive')) return '#8b5cf6';
+        if (mimeType.includes('video')) return '#ec4899';
+        if (mimeType.includes('audio')) return '#06b6d4';
+        return '#6b7280';
+    };
+
+    return (
+        <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0.35rem 0.6rem',
+            backgroundColor: `${getColor()}15`,
+            color: getColor(),
+            borderRadius: '4px',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            fontFamily: 'monospace',
+            letterSpacing: '0.025em'
+        }}>
+            {getLabel()}
+        </span>
+    );
+};
+
 export default function DataFileList({
     files,
     canEdit
@@ -71,21 +115,9 @@ export default function DataFileList({
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
 
-    const getFileIcon = (mimeType: string) => {
-        if (mimeType.startsWith('image/')) return '🖼️';
-        if (mimeType.includes('pdf')) return '📄';
-        if (mimeType.includes('word') || mimeType.includes('document')) return '📝';
-        if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📊';
-        if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return '📽️';
-        if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('archive')) return '📦';
-        if (mimeType.includes('video')) return '🎬';
-        if (mimeType.includes('audio')) return '🎵';
-        return '📁';
-    };
-
     const getSortIcon = (key: SortKey) => {
-        if (sortKey !== key) return '↕️';
-        return sortOrder === 'asc' ? '↑' : '↓';
+        if (sortKey !== key) return '';
+        return sortOrder === 'asc' ? ' ↑' : ' ↓';
     };
 
     if (files.length === 0) {
@@ -93,10 +125,24 @@ export default function DataFileList({
             <div style={{
                 textAlign: 'center',
                 padding: '4rem 2rem',
-                color: 'var(--color-text-muted)'
+                color: 'var(--color-text-muted)',
+                backgroundColor: 'var(--color-bg-elevated)',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px dashed var(--color-border)'
             }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
-                <p>目前沒有檔案</p>
+                <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    style={{ marginBottom: '1rem', opacity: 0.5 }}
+                >
+                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                    <polyline points="13 2 13 9 20 9" />
+                </svg>
+                <p style={{ margin: 0, fontSize: '1rem' }}>目前沒有檔案</p>
             </div>
         );
     }
@@ -110,29 +156,47 @@ export default function DataFileList({
                 alignItems: 'center',
                 marginBottom: '1.5rem',
                 flexWrap: 'wrap',
-                gap: '1rem'
+                gap: '1rem',
+                padding: '1rem',
+                backgroundColor: 'var(--color-bg-elevated)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border)'
             }}>
                 {/* View Toggle */}
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                         onClick={() => setViewMode('card')}
                         className={`btn ${viewMode === 'card' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ padding: '0.5rem 1rem' }}
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                     >
-                        🗂️ 卡片
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                        卡片
                     </button>
                     <button
                         onClick={() => setViewMode('list')}
                         className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ padding: '0.5rem 1rem' }}
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                     >
-                        📋 清單
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
+                            <line x1="8" y1="6" x2="21" y2="6" />
+                            <line x1="8" y1="12" x2="21" y2="12" />
+                            <line x1="8" y1="18" x2="21" y2="18" />
+                            <line x1="3" y1="6" x2="3.01" y2="6" />
+                            <line x1="3" y1="12" x2="3.01" y2="12" />
+                            <line x1="3" y1="18" x2="3.01" y2="18" />
+                        </svg>
+                        清單
                     </button>
                 </div>
 
                 {/* Sort Dropdown */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>排序：</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>排序：</span>
                     <select
                         value={sortKey}
                         onChange={(e) => setSortKey(e.target.value as SortKey)}
@@ -142,7 +206,8 @@ export default function DataFileList({
                             border: '1px solid var(--color-border)',
                             backgroundColor: 'var(--color-bg-surface)',
                             color: 'var(--color-text)',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            fontSize: '0.85rem'
                         }}
                     >
                         <option value="createdAt">建立時間</option>
@@ -155,7 +220,7 @@ export default function DataFileList({
                     <button
                         onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                         className="btn btn-outline"
-                        style={{ padding: '0.5rem 0.75rem' }}
+                        style={{ padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
                     >
                         {sortOrder === 'asc' ? '↑ 升序' : '↓ 降序'}
                     </button>
@@ -167,7 +232,7 @@ export default function DataFileList({
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                    gap: '1.5rem'
+                    gap: '1.25rem'
                 }}>
                     {sortedFiles.map(file => (
                         <Link
@@ -178,62 +243,66 @@ export default function DataFileList({
                             <div
                                 className="glass"
                                 style={{
-                                    padding: '1.5rem',
+                                    padding: '1.25rem',
                                     borderRadius: 'var(--radius-lg)',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s ease',
-                                    border: '2px solid transparent'
+                                    border: '1px solid var(--color-border)',
+                                    height: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column'
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-4px)';
-                                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.15)';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)';
                                     e.currentTarget.style.borderColor = 'var(--color-primary)';
                                 }}
                                 onMouseLeave={(e) => {
                                     e.currentTarget.style.transform = 'translateY(0)';
                                     e.currentTarget.style.boxShadow = '';
-                                    e.currentTarget.style.borderColor = 'transparent';
+                                    e.currentTarget.style.borderColor = 'var(--color-border)';
                                 }}
                             >
                                 <div style={{
                                     display: 'flex',
                                     justifyContent: 'space-between',
-                                    alignItems: 'flex-start',
+                                    alignItems: 'center',
                                     marginBottom: '1rem'
                                 }}>
-                                    <span style={{ fontSize: '2rem' }}>
-                                        {getFileIcon(file.mimeType)}
-                                    </span>
+                                    <FileTypeIcon mimeType={file.mimeType} />
                                     <span style={{
-                                        padding: '0.25rem 0.75rem',
+                                        padding: '0.25rem 0.6rem',
                                         backgroundColor: 'var(--color-primary-soft)',
                                         color: 'var(--color-primary)',
-                                        borderRadius: '999px',
-                                        fontSize: '0.8rem',
+                                        borderRadius: '4px',
+                                        fontSize: '0.75rem',
                                         fontWeight: 600
                                     }}>
                                         {file.dataYear}
                                     </span>
                                 </div>
+
                                 {/* Pending Badge */}
                                 {file.hasPendingRequest && (
                                     <div style={{
-                                        padding: '0.35rem 0.75rem',
+                                        padding: '0.35rem 0.6rem',
                                         backgroundColor: 'var(--color-warning-soft)',
                                         color: 'var(--color-warning)',
                                         borderRadius: '4px',
-                                        fontSize: '0.75rem',
+                                        fontSize: '0.7rem',
                                         fontWeight: 600,
                                         marginBottom: '0.75rem',
-                                        display: 'inline-block'
+                                        display: 'inline-block',
+                                        width: 'fit-content'
                                     }}>
-                                        ⏳ 審核中 ({file.pendingRequestType === 'FILE_UPDATE' ? '編輯' : file.pendingRequestType === 'FILE_DELETE' ? '刪除' : '新增'})
+                                        審核中 ({file.pendingRequestType === 'FILE_UPDATE' ? '編輯' : file.pendingRequestType === 'FILE_DELETE' ? '刪除' : '新增'})
                                     </div>
                                 )}
+
                                 <h3 style={{
-                                    fontSize: '1.1rem',
+                                    fontSize: '1rem',
                                     fontWeight: 600,
-                                    marginBottom: '0.5rem',
+                                    marginBottom: '0.4rem',
                                     color: 'var(--color-text)',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
@@ -242,15 +311,15 @@ export default function DataFileList({
                                     {file.dataName}
                                 </h3>
                                 <div style={{
-                                    fontSize: '0.85rem',
+                                    fontSize: '0.8rem',
                                     color: 'var(--color-text-muted)',
-                                    marginBottom: '0.75rem',
+                                    marginBottom: '0.6rem',
                                     fontFamily: 'monospace'
                                 }}>
                                     {file.dataCode}
                                 </div>
                                 <p style={{
-                                    fontSize: '0.9rem',
+                                    fontSize: '0.85rem',
                                     color: 'var(--color-text-secondary)',
                                     marginBottom: '1rem',
                                     overflow: 'hidden',
@@ -258,7 +327,8 @@ export default function DataFileList({
                                     display: '-webkit-box',
                                     WebkitLineClamp: 2,
                                     WebkitBoxOrient: 'vertical',
-                                    lineHeight: 1.5
+                                    lineHeight: 1.5,
+                                    flex: 1
                                 }}>
                                     {file.description}
                                 </p>
@@ -266,13 +336,13 @@ export default function DataFileList({
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     alignItems: 'center',
-                                    fontSize: '0.8rem',
+                                    fontSize: '0.75rem',
                                     color: 'var(--color-text-muted)',
                                     borderTop: '1px solid var(--color-border)',
                                     paddingTop: '0.75rem',
                                     marginTop: 'auto'
                                 }}>
-                                    <span>👤 {file.author}</span>
+                                    <span>{file.author}</span>
                                     <span>{formatFileSize(file.fileSize)}</span>
                                 </div>
                             </div>
@@ -283,27 +353,27 @@ export default function DataFileList({
 
             {/* List View */}
             {viewMode === 'list' && (
-                <div className="glass" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                <div className="glass" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ backgroundColor: 'var(--color-bg-elevated)' }}>
                                 <th style={thStyle} onClick={() => handleSort('dataName')}>
-                                    名稱 {getSortIcon('dataName')}
+                                    名稱{getSortIcon('dataName')}
                                 </th>
                                 <th style={thStyle} onClick={() => handleSort('dataCode')}>
-                                    編碼 {getSortIcon('dataCode')}
+                                    編碼{getSortIcon('dataCode')}
                                 </th>
                                 <th style={thStyle} onClick={() => handleSort('dataYear')}>
-                                    年份 {getSortIcon('dataYear')}
+                                    年份{getSortIcon('dataYear')}
                                 </th>
                                 <th style={thStyle} onClick={() => handleSort('author')}>
-                                    作者 {getSortIcon('author')}
+                                    作者{getSortIcon('author')}
                                 </th>
                                 <th style={thStyle} onClick={() => handleSort('fileSize')}>
-                                    大小 {getSortIcon('fileSize')}
+                                    大小{getSortIcon('fileSize')}
                                 </th>
                                 <th style={thStyle} onClick={() => handleSort('createdAt')}>
-                                    建立時間 {getSortIcon('createdAt')}
+                                    建立時間{getSortIcon('createdAt')}
                                 </th>
                                 <th style={thStyle}>
                                     狀態
@@ -316,16 +386,16 @@ export default function DataFileList({
                                     key={file.id}
                                     style={{ borderBottom: '1px solid var(--color-border)', cursor: 'pointer' }}
                                     onClick={() => window.location.href = `/datafiles/${file.id}`}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary-soft)'}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)'}
                                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
                                 >
                                     <td style={tdStyle}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span>{getFileIcon(file.mimeType)}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <FileTypeIcon mimeType={file.mimeType} />
                                             <span style={{ fontWeight: 500 }}>{file.dataName}</span>
                                         </div>
                                     </td>
-                                    <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                                    <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                                         {file.dataCode}
                                     </td>
                                     <td style={tdStyle}>
@@ -334,14 +404,15 @@ export default function DataFileList({
                                             backgroundColor: 'var(--color-primary-soft)',
                                             color: 'var(--color-primary)',
                                             borderRadius: '4px',
-                                            fontSize: '0.8rem'
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600
                                         }}>
                                             {file.dataYear}
                                         </span>
                                     </td>
                                     <td style={tdStyle}>{file.author}</td>
-                                    <td style={tdStyle}>{formatFileSize(file.fileSize)}</td>
-                                    <td style={{ ...tdStyle, color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                                    <td style={{ ...tdStyle, fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{formatFileSize(file.fileSize)}</td>
+                                    <td style={{ ...tdStyle, color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
                                         {formatDate(file.createdAt)}
                                     </td>
                                     <td style={tdStyle}>
@@ -351,13 +422,22 @@ export default function DataFileList({
                                                 backgroundColor: 'var(--color-warning-soft)',
                                                 color: 'var(--color-warning)',
                                                 borderRadius: '4px',
-                                                fontSize: '0.75rem',
+                                                fontSize: '0.7rem',
                                                 fontWeight: 600
                                             }}>
-                                                ⏳ 審核中
+                                                審核中
                                             </span>
                                         ) : (
-                                            <span style={{ color: 'var(--color-success)', fontSize: '0.85rem' }}>✓</span>
+                                            <span style={{
+                                                padding: '0.25rem 0.5rem',
+                                                backgroundColor: 'var(--color-success-soft)',
+                                                color: 'var(--color-success)',
+                                                borderRadius: '4px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 600
+                                            }}>
+                                                正常
+                                            </span>
                                         )}
                                     </td>
                                 </tr>
@@ -371,17 +451,18 @@ export default function DataFileList({
 }
 
 const thStyle: React.CSSProperties = {
-    padding: '1rem',
+    padding: '0.875rem 1rem',
     textAlign: 'left',
     fontWeight: 600,
-    fontSize: '0.85rem',
+    fontSize: '0.8rem',
     color: 'var(--color-text-muted)',
     cursor: 'pointer',
     userSelect: 'none',
-    whiteSpace: 'nowrap'
+    whiteSpace: 'nowrap',
+    borderBottom: '1px solid var(--color-border)'
 };
 
 const tdStyle: React.CSSProperties = {
-    padding: '1rem',
+    padding: '0.875rem 1rem',
     verticalAlign: 'middle'
 };

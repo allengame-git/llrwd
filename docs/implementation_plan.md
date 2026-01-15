@@ -1,16 +1,19 @@
 # 功能實作計畫 (implementation_plan.md)
 
-> 最後更新: 2026-01-08
+> 最後更新: 2026-01-15
 
 本文件記錄各功能的需求分析與技術設計。
 
 ## 最新更新
 
-- **Phase 8.1**: 首頁儀表板 Infographic 改版 ✅ 已完成 (2026-01-07)
-- **Phase 8.2**: 側邊欄導覽強化 (Accordion) ✅ 已完成 (2026-01-07)
-- **Phase 8.3**: 歷史詳情審查紀錄優化 ✅ 已完成 (2026-01-07)
-- **Phase 6.5**: Docker 部署準備 ✅ 已完成 (2026-01-05)
-- **Phase 6.4**: 全域歷史 Dashboard 優化 ✅ 已完成 (2026-01-05)
+- **Phase 23**: 專案頁面中文化與 UI 優化 ✅ 已完成 (2026-01-15)
+- **Phase 22**: PDF 截斷修復 (支援多頁分頁) ✅ 已完成 (2026-01-14)
+- **Phase 21**: 品質文件 PDF 歷史快照強化 ✅ 已完成 (2026-01-14)
+- **Phase 20**: 品質文件 PDF 歷史快照功能恢復 ✅ 已完成 (2026-01-14)
+- **Phase 19**: 富文本編輯器強化 (巢狀編號、縮排) ✅ 已完成 (2026-01-14)
+- **Phase 18**: PDF-lib 重構與 Vercel 部署 ✅ 已完成 (2026-01-14)
+- **Phase 17**: 專案複製功能 ✅ 已完成 (2026-01-13)
+- **Phase 16**: QC/PM 複審流程 ✅ 已完成 (2026-01-13)
 
 ---
 
@@ -23,6 +26,10 @@
 5. [項目編輯刪除流程](#5-項目編輯刪除流程-item-editdelete)
 6. [Rich Text Editor 圖片功能](#6-rich-text-editor-圖片功能)
 7. [Approval Dashboard 優化](#7-approval-dashboard-優化)
+8. [富文本編輯器強化 (Phase 19)](#8-富文本編輯器強化-phase-19)
+9. [品質文件 PDF 歷史快照功能恢復 (Phase 20)](#9-品質文件-pdf-歷史快照功能恢復-phase-20)
+10. [品質文件 PDF 歷史快照強化 (Phase 21)](#10-品質文件-pdf-歷史快照強化-phase-21)
+11. [PDF 截斷修復 (Phase 22)](#11-pdf-截斷修復-phase-22)
 
 ---
 
@@ -567,3 +574,200 @@ const handleDrop = (e: React.DragEvent) => {
 - **狀態管理**: Loading, Success, Error 狀態切換
 
 ### 16.3 狀態: ✅ 已完成
+
+---
+
+## 17. Phase 16: QC/PM 複審流程
+
+> Status: ✅ Done (v1.8.0)
+
+### 17.1 需求分析
+
+- **痛點**: 品質文件審核若有問題，只能全部駁回，無法要求部分修訂
+- **解法**: 新增「要求修訂」狀態，允許 QC/PM 退回要求修改後重新提交
+
+### 17.2 技術實作
+
+**Schema 擴充**:
+
+```prisma
+model QCDocumentApproval {
+  // ...existing fields
+  revisionCount Int @default(0)  // 修訂次數
+}
+```
+
+**狀態流程**:
+
+| 狀態 | 說明 |
+| :--- | :--- |
+| `PENDING_QC` | 待 QC 審核 |
+| `PENDING_PM` | 待 PM 核定 |
+| `REVISION_REQUIRED` | 需要修訂 (被退回) |
+| `COMPLETED` | 審核完成 |
+| `REJECTED` | 永久駁回 |
+
+**Server Actions**:
+
+- `requestRevision(id, note)`: QC/PM 要求修訂
+- 修訂完成後重新提交，狀態自動轉為 `PENDING_QC` 或 `PENDING_PM`
+- 每次修訂 `revisionCount++`
+
+### 17.3 狀態: ✅ 已完成
+
+---
+
+## 18. Phase 17: 專案複製功能
+
+> Status: ✅ Done (v1.8.0)
+
+### 18.1 需求分析
+
+- **目標**: 快速建立相似結構的新專案
+- **範圍**: 複製專案基本資料與項目結構
+- **選項**: 可選擇是否包含項目內容與附件
+
+### 18.2 技術實作
+
+**Server Action**: `duplicateProject(projectId, newTitle, newPrefix)`
+
+```typescript
+// 核心邏輯
+async function duplicateProject(projectId: number, title: string, prefix: string) {
+  // 1. 建立新專案
+  const newProject = await prisma.project.create({ data: { title, codePrefix: prefix } });
+  
+  // 2. 取得原專案所有項目
+  const items = await prisma.item.findMany({ where: { projectId } });
+  
+  // 3. 遞迴複製項目 (維持父子關係)
+  const idMap = new Map<number, number>();
+  for (const item of items) {
+    const newItem = await prisma.item.create({
+      data: {
+        projectId: newProject.id,
+        parentId: item.parentId ? idMap.get(item.parentId) : null,
+        fullId: generateFullId(prefix, item),
+        title: item.title,
+        content: item.content,
+        // ...
+      }
+    });
+    idMap.set(item.id, newItem.id);
+  }
+  
+  return newProject;
+}
+```
+
+### 18.3 狀態: ✅ 已完成
+
+---
+
+## 19. Phase 18: PDF-lib 重構與 Vercel 部署
+
+> Status: ✅ Done (v1.8.0)
+
+### 19.1 需求分析
+
+- **問題**: Puppeteer 套件過大 (~200MB)，不適合 Serverless 環境
+- **解法**: 移除 Puppeteer 依賴，改用 pdf-lib 純文字渲染
+
+### 19.2 技術實作
+
+**PDF 生成重構**:
+
+```typescript
+// 舊版: 使用 Puppeteer 截圖
+// const screenshot = await renderHtmlToPDF(htmlContent);
+
+// 新版: 使用 pdf-lib 純文字
+async function generateHistorySummaryPages(pdfDoc: PDFDocument, history: ItemHistory) {
+  const page = pdfDoc.addPage();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  
+  // 繪製歷史摘要 (項目編號、標題、變更類型等)
+  page.drawText(`Item: ${history.itemFullId}`, { x: 50, y: 750, font });
+  page.drawText(`Change Type: ${history.changeType}`, { x: 50, y: 730, font });
+  // ...
+}
+```
+
+**Vercel 部署調整**:
+
+1. `force-dynamic` 加入所有動態 API 路由
+2. 移除 fs 寫入操作 (Serverless 無持久化檔案系統)
+3. 使用 Neon PostgreSQL 替代本地資料庫
+
+---
+
+## 8. 富文本編輯器強化 (Phase 19)
+
+### 需求
+
+- 支援有序列表的巢狀編號 (如 1.1, 1.2.1)。
+- 支援段落與列表的增加/減少縮排。
+- 支援文字對齊 (左、中、右)。
+- 確保所有渲染富文本的頁面樣式一致。
+
+### 技術方案
+
+| 功能 | 實作方式 |
+|------|----------|
+| 巢狀編號 | CSS Counters (`counter-reset`, `counter-increment`, `counters()`) |
+| 縮排功能 | 自定義 `Indent` Tiptap Extension，透過 `margin-left` inline style 儲存 |
+| 快捷鍵 | 整合 `Tab` / `Shift+Tab` 觸發縮排/凸排 |
+| 文字對齊 | 整合 `@tiptap/extension-text-align` |
+| 樣式一致性 | 定義全域 `.rich-text-content` class，並套用於所有渲染區塊 |
+
+### 列表縮排邏輯
+
+為了維持 HTML 結構的語意化，當在列表項目中增加縮排時，使用的是 Tiptap 核心的 `sinkListItem` 指令（建立巢狀 `ol`/`ul`）；在一般段落時則使用 CSS `margin-left`。
+
+### 狀態: ✅ 已完成
+
+---
+
+## 9. 品質文件 PDF 歷史快照功能恢復 (Phase 20)
+
+### 需求
+
+恢復 PDF 歷史快照使用 Puppeteer 截圖呈現，以支援更複雜的富文本排版與所見即所得效果。
+
+### 技術方案
+
+- 位置: `src/lib/pdf-generator.ts`
+- 修改 `generateQCDocument` 邏輯。
+- 呼叫 `renderHtmlToImage` 生成 PNG 後嵌入 PDF。
+- 支援 A4 比例縮放與高度限制（避免過長圖片破壞版面）。
+
+### 容錯機制
+
+若截圖過程發生錯誤，系統將自動呼叫 `generateHistorySummaryPages` 生成純文字摘要作為備援。
+
+### 狀態: ✅ 已完成
+
+---
+
+## 11. PDF 截斷修復 (Phase 22)
+
+### 需求
+
+原本的歷史快照採用 Puppeteer 截圖 (Image 嵌入) 方式，當內容過長 (超過 1000px) 時會被截斷，無法在 PDF 中完整顯示多頁內容。
+
+### 技術方案
+
+- **從 Image 轉向 PDF**: 不再生成圖片，而是直接利用 Puppeteer 的 PDF 列印功能生成標準 A4 PDF。
+- **多頁合併支援**: 使用 `pdf-lib` 的 `copyPages` 功能，將產生的歷史 PDF 頁面逐一拷貝並追加到主文件 (QC 單) 末尾。
+- **佈局優化**:
+  - 歷史時間軸改為垂直週期佈局，避免水平文字截斷。
+  - 圖片 URL 自動轉為絕對路徑，確保 Puppeteer 可順利下載。
+  - 關聯項目、參考文獻、附件等 JSON 數據格式化為清單輸出。
+
+### 優點
+
+- **無長度限制**: 自動根據內容長度產生分頁，不再有截斷問題。
+- **文字搜尋**: 產生的是向量 PDF 而非圖片，內文可進行關鍵字搜尋。
+- **清晰度提升**: 避免圖片縮放導致的模糊問題。
+
+### 狀態: ✅ 已完成
