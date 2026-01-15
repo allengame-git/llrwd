@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
+import NotificationBell from "./NotificationBell";
 
 export default function Navbar() {
     const pathname = usePathname();
     const { data: session } = useSession();
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     const [pendingCount, setPendingCount] = useState(0);
+    const [hasApprovalAccess, setHasApprovalAccess] = useState(false);
 
     useEffect(() => {
         // Load theme on mount
@@ -17,14 +20,18 @@ export default function Navbar() {
         setTheme(savedTheme);
     }, []);
 
-    // Fetch pending count for ADMIN/INSPECTOR
+    // Fetch pending count for ADMIN/INSPECTOR/QC/PM
     useEffect(() => {
-        if (session && (session.user.role === "ADMIN" || session.user.role === "INSPECTOR")) {
+        if (session) {
             const fetchCount = async () => {
                 try {
                     const res = await fetch('/api/pending-count');
                     const data = await res.json();
                     setPendingCount(data.count || 0);
+                    // Show approval link if user has pending items or is ADMIN/INSPECTOR
+                    const hasAccess = (data.count > 0) ||
+                        ["ADMIN", "INSPECTOR"].includes(session.user.role);
+                    setHasApprovalAccess(hasAccess || data.hasApprovalAccess);
                 } catch (e) {
                     console.error('Failed to fetch pending count');
                 }
@@ -32,6 +39,25 @@ export default function Navbar() {
             fetchCount();
             // Refresh every 30 seconds
             const interval = setInterval(fetchCount, 30000);
+            return () => clearInterval(interval);
+        }
+    }, [session]);
+
+    // Fetch rejected requests count for all logged-in users
+    const [rejectedCount, setRejectedCount] = useState(0);
+    useEffect(() => {
+        if (session) {
+            const fetchRejectedCount = async () => {
+                try {
+                    const res = await fetch('/api/rejected-count');
+                    const data = await res.json();
+                    setRejectedCount(data.count || 0);
+                } catch (e) {
+                    console.error('Failed to fetch rejected count');
+                }
+            };
+            fetchRejectedCount();
+            const interval = setInterval(fetchRejectedCount, 30000);
             return () => clearInterval(interval);
         }
     }, [session]);
@@ -59,9 +85,17 @@ export default function Navbar() {
                 alignItems: "center",
                 justifyContent: "space-between"
             }}>
-                <div className="flex-center gap-md">
-                    <Link href="/" style={{ fontSize: "1.25rem", fontWeight: "bold", color: "var(--color-primary)" }}>
-                        RMS
+                <div className="flex-center gap-md" style={{ flexShrink: 0 }}>
+                    <Link href="/" className="flex-center" style={{ textDecoration: 'none', gap: '0.75rem', whiteSpace: 'nowrap' }}>
+                        <Image src="/taipower_logo.png" alt="Taipower Logo" width={42} height={42} style={{ objectFit: 'contain' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                            <span style={{ fontSize: "0.95rem", fontWeight: "bold", color: "var(--color-primary)", letterSpacing: '0.2px' }}>
+                                低放射性廢棄物處置管理系統
+                            </span>
+                            <span style={{ fontSize: "0.6rem", color: "var(--color-text-muted)", fontWeight: 500 }}>
+                                LLRWD Management System
+                            </span>
+                        </div>
                     </Link>
 
                     {session && (
@@ -69,38 +103,66 @@ export default function Navbar() {
                             <Link
                                 href="/projects"
                                 className={`btn btn-outline ${isActive("/projects") ? "active-link" : ""}`}
-                                style={{ border: "none", padding: "0.5rem 1rem" }}
+                                style={{ border: "none", padding: "0.5rem 0.75rem", whiteSpace: 'nowrap' }}
                             >
-                                Projects
+                                專案管理
                             </Link>
                             <Link
                                 href="/datafiles"
                                 className={`btn btn-outline ${isActive("/datafiles") ? "active-link" : ""}`}
                                 style={{ border: "none", padding: "0.5rem 1rem" }}
                             >
-                                Files
+                                檔案管理
                             </Link>
                             <Link
                                 href="/admin/history"
                                 className={`btn btn-outline ${isActive("/admin/history") ? "active-link" : ""}`}
                                 style={{ border: "none", padding: "0.5rem 1rem" }}
                             >
-                                History
+                                歷史記錄
                             </Link>
                             <Link
                                 href="/iso-docs"
                                 className={`btn btn-outline ${isActive("/iso-docs") ? "active-link" : ""}`}
                                 style={{ border: "none", padding: "0.5rem 1rem" }}
                             >
-                                ISO Docs
+                                ISO文件
                             </Link>
-                            {(session.user.role === "ADMIN" || session.user.role === "INSPECTOR") && (
+                            <Link
+                                href="/admin/rejected-requests"
+                                className={`btn btn-outline ${isActive("/admin/rejected-requests") ? "active-link" : ""}`}
+                                style={{ border: "none", padding: "0.5rem 1rem", position: "relative" }}
+                            >
+                                待修改
+                                {rejectedCount > 0 && (
+                                    <span style={{
+                                        position: "absolute",
+                                        top: "0",
+                                        right: "0",
+                                        transform: "translate(30%, -30%)",
+                                        backgroundColor: "#f59e0b",
+                                        color: "white",
+                                        fontSize: "0.7rem",
+                                        fontWeight: "bold",
+                                        minWidth: "18px",
+                                        height: "18px",
+                                        borderRadius: "9px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        padding: "0 4px"
+                                    }}>
+                                        {rejectedCount > 99 ? '99+' : rejectedCount}
+                                    </span>
+                                )}
+                            </Link>
+                            {(hasApprovalAccess || ["ADMIN", "INSPECTOR"].includes(session.user.role)) && (
                                 <Link
                                     href="/admin/approval"
                                     className={`btn btn-outline ${isActive("/admin/approval") ? "active-link" : ""}`}
                                     style={{ border: "none", padding: "0.5rem 1rem", position: "relative" }}
                                 >
-                                    Approvals
+                                    審核作業
                                     {pendingCount > 0 && (
                                         <span style={{
                                             position: "absolute",
@@ -130,7 +192,7 @@ export default function Navbar() {
                                     className={`btn btn-outline ${isActive("/admin/users") ? "active-link" : ""}`}
                                     style={{ border: "none", padding: "0.5rem 1rem" }}
                                 >
-                                    Users
+                                    使用者管理
                                 </Link>
                             )}
                         </div>
@@ -148,6 +210,7 @@ export default function Navbar() {
                             {theme === 'dark' ? '☀️' : '🌙'}
                         </button>
                     )}
+                    {session && <NotificationBell />}
                     {session ? (
                         <>
                             <span style={{ fontSize: "0.9rem", color: "var(--color-text-muted)" }}>
@@ -158,14 +221,10 @@ export default function Navbar() {
                                 className="btn btn-outline"
                                 style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}
                             >
-                                Sign Out
+                                登出
                             </button>
                         </>
-                    ) : (
-                        <Link href="/auth/login" className="btn btn-primary">
-                            Login
-                        </Link>
-                    )}
+                    ) : null}
                 </div>
             </div>
             <style jsx>{`

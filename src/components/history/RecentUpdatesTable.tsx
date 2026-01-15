@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { formatDate } from '@/lib/date-utils';
 
 type UpdateRecord = {
     id: string;
@@ -29,7 +30,7 @@ function formatRelativeTime(date: Date): string {
     if (minutes < 60) return `${minutes} 分鐘前`;
     if (hours < 24) return `${hours} 小時前`;
     if (days < 7) return `${days} 天前`;
-    return new Date(date).toLocaleDateString('zh-TW');
+    return formatDate(date);
 }
 
 // 操作類型標籤

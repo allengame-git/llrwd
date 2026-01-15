@@ -74,3 +74,129 @@ export async function getProjects() {
     });
     return projects;
 }
+
+/**
+ * Copy a project with all its items to a new code prefix
+ */
+export async function copyProject(
+    sourceProjectId: number,
+    newTitle: string,
+    newCodePrefix: string,
+    newDescription?: string
+): Promise<ProjectState> {
+    const session = await getServerSession(authOptions);
+
+    if (!session || session.user.role === "VIEWER") {
+        return { error: "權限不足：僅編輯者以上可複製專案" };
+    }
+
+    // Validate inputs
+    if (!newTitle?.trim()) {
+        return { error: "專案標題為必填" };
+    }
+
+    if (!newCodePrefix?.trim()) {
+        return { error: "專案代碼為必填" };
+    }
+
+    // Code Prefix format validation
+    const normalizedPrefix = newCodePrefix.trim().toUpperCase();
+    if (!/^[A-Z0-9]+$/.test(normalizedPrefix)) {
+        return { error: "專案代碼僅可使用大寫英文字母與數字" };
+    }
+
+    try {
+        // Check if source project exists
+        const sourceProject = await prisma.project.findUnique({
+            where: { id: sourceProjectId },
+            include: {
+                items: {
+                    where: { isDeleted: false },
+                    orderBy: { fullId: 'asc' }
+                }
+            }
+        });
+
+        if (!sourceProject) {
+            return { error: "來源專案不存在" };
+        }
+
+        // Check if new codePrefix already exists
+        const existingCodeProject = await prisma.project.findUnique({
+            where: { codePrefix: normalizedPrefix }
+        });
+
+        if (existingCodeProject) {
+            return { error: `專案代碼「${normalizedPrefix}」已被使用，請輸入其他代碼` };
+        }
+
+        // Check if title already exists
+        const normalizedTitle = newTitle.trim();
+        const existingTitleProject = await prisma.project.findFirst({
+            where: { title: normalizedTitle }
+        });
+
+        if (existingTitleProject) {
+            return { error: `專案標題「${normalizedTitle}」已存在，請輸入其他標題` };
+        }
+
+        // Create new project
+        const newProject = await prisma.project.create({
+            data: {
+                title: newTitle.trim(),
+                description: newDescription?.trim() || sourceProject.description,
+                codePrefix: normalizedPrefix
+            }
+        });
+
+        // Copy items with hierarchy
+        if (sourceProject.items.length > 0) {
+            // Build a map of old ID -> new ID
+            const idMap = new Map<number, number>();
+
+            // First pass: create all items without parentId
+            // Sort by fullId length to process parents first
+            const sortedItems = [...sourceProject.items].sort(
+                (a, b) => a.fullId.split('-').length - b.fullId.split('-').length
+            );
+
+            for (const item of sortedItems) {
+                // Calculate new fullId
+                const oldParts = item.fullId.split('-');
+                const newParts = [normalizedPrefix, ...oldParts.slice(1)];
+                const newFullId = newParts.join('-');
+
+                // Determine new parentId
+                let newParentId: number | null = null;
+                if (item.parentId && idMap.has(item.parentId)) {
+                    newParentId = idMap.get(item.parentId)!;
+                }
+
+                // Create new item
+                const newItem = await prisma.item.create({
+                    data: {
+                        fullId: newFullId,
+                        title: item.title,
+                        content: item.content,
+                        attachments: item.attachments,
+                        projectId: newProject.id,
+                        parentId: newParentId,
+                        currentVersion: 1
+                    }
+                });
+
+                idMap.set(item.id, newItem.id);
+            }
+        }
+
+        revalidatePath("/projects");
+        return { message: `專案已複製為 ${normalizedPrefix}` };
+    } catch (e: any) {
+        console.error("Copy project error:", e);
+        if (e.code === 'P2002') {
+            return { error: "專案代碼或項目編號重複" };
+        }
+        return { error: "複製專案失敗: " + (e.message || "未知錯誤") };
+    }
+}
+

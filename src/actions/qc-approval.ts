@@ -5,6 +5,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { generateQCDocument } from "@/lib/pdf-generator";
+import { createNotification } from "./notifications";
+import { getRequestChain } from "./history";
 
 // ============================================
 // QC Document Approval Actions
@@ -167,6 +169,11 @@ export async function approveAsQC(
         });
 
         if (fullHistory) {
+            let reviewChain: any[] = [];
+            if (approval.itemHistory.changeRequestId) {
+                reviewChain = await getRequestChain(approval.itemHistory.changeRequestId);
+            }
+
             const pdfPath = await generateQCDocument({
                 // @ts-ignore - Prisma types vs Local Interface
                 ...fullHistory,
@@ -176,7 +183,8 @@ export async function approveAsQC(
                 qcUser: user.username, // Passed from session user
                 pmNote: null,
                 pmDate: null,
-                pmUser: null
+                pmUser: null,
+                reviewChain
             }, null);
 
             // Update history with new path
@@ -256,6 +264,11 @@ export async function approveAsPM(
         });
 
         if (fullHistory) {
+            let reviewChain: any[] = [];
+            if (approval.itemHistory.changeRequestId) {
+                reviewChain = await getRequestChain(approval.itemHistory.changeRequestId);
+            }
+
             const pdfPath = await generateQCDocument({
                 // @ts-ignore
                 ...fullHistory,
@@ -265,7 +278,8 @@ export async function approveAsPM(
                 qcUser: approval.qcApprovedBy?.username, // Existing QC approver
                 pmNote: note || "同意",
                 pmDate: new Date(),
-                pmUser: user.username // Current PM approver
+                pmUser: user.username, // Current PM approver
+                reviewChain
             }, null);
 
             await prisma.itemHistory.update({
@@ -288,13 +302,26 @@ export async function approveAsPM(
         }
     });
 
+    // Send completion notification to original submitter
+    if (approval.itemHistory.submittedById) {
+        await createNotification({
+            userId: approval.itemHistory.submittedById,
+            type: "COMPLETED",
+            title: `品質文件審核完成`,
+            message: `${approval.itemHistory.itemFullId} ${approval.itemHistory.itemTitle} - 已完成 PM 核定`,
+            link: `/admin/history/detail/${approval.itemHistory.id}`,
+            qcApprovalId: approvalId,
+            itemHistoryId: approval.itemHistory.id,
+        });
+    }
+
     revalidatePath("/admin/approvals");
     revalidatePath("/iso-docs");
     return { message: "PM approval completed - Document finalized" };
 }
 
 /**
- * Reject QC Document at any stage
+ * Reject QC Document - Changes status to REJECTED and marks the original ChangeRequest as REJECTED
  */
 export async function rejectQCDocument(
     approvalId: number,
@@ -306,16 +333,27 @@ export async function rejectQCDocument(
     // Verify user has QC or PM qualification
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { isQC: true, isPM: true }
+        select: { isQC: true, isPM: true, username: true }
     });
 
     if (!user?.isQC && !user?.isPM) {
         return { error: "Unauthorized - QC or PM qualification required" };
     }
 
-    // Get the approval record
+    // Get the approval record with itemHistory and the associated change request
     const approval = await prisma.qCDocumentApproval.findUnique({
-        where: { id: approvalId }
+        where: { id: approvalId },
+        include: {
+            itemHistory: {
+                select: {
+                    id: true,
+                    itemFullId: true,
+                    itemTitle: true,
+                    submittedById: true,
+                    changeRequestId: true,
+                }
+            }
+        }
     });
 
     if (!approval) return { error: "Approval record not found" };
@@ -328,7 +366,7 @@ export async function rejectQCDocument(
         return { error: "Only PM users can reject at PM stage" };
     }
 
-    // Update status to rejected
+    // Update approval status to REJECTED
     const updateData: any = {
         status: "REJECTED",
     };
@@ -348,10 +386,37 @@ export async function rejectQCDocument(
         data: updateData
     });
 
+    // CRITICAL: Also mark the original ChangeRequest as REJECTED so it appears in /admin/rejected-requests
+    if (approval.itemHistory.changeRequestId) {
+        await prisma.changeRequest.update({
+            where: { id: approval.itemHistory.changeRequestId },
+            data: {
+                status: "REJECTED",
+                reviewedById: session.user.id,
+                reviewNote: note,
+            }
+        });
+    }
+
+    // Send notification to editor - Now linking back to standard rejected-requests
+    if (approval.itemHistory.submittedById && approval.itemHistory.changeRequestId) {
+        await createNotification({
+            userId: approval.itemHistory.submittedById,
+            type: "REJECTION",
+            title: `品質文件已被退回 (${user.isPM ? 'PM' : 'QC'})`,
+            message: `${approval.itemHistory.itemFullId} ${approval.itemHistory.itemTitle} - ${note}`,
+            link: `/admin/rejected-requests/${approval.itemHistory.changeRequestId}`,
+            qcApprovalId: approvalId,
+            itemHistoryId: approval.itemHistory.id,
+        });
+    }
+
     revalidatePath("/admin/approvals");
+    revalidatePath("/admin/rejected-requests");
     revalidatePath("/iso-docs");
-    return { message: "Document rejected" };
+    return { message: "已退回要求修改" };
 }
+
 
 /**
  * Create a QC Document Approval record for a new ItemHistory

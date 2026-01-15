@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import { validatePassword } from "@/lib/password-policy";
 
 export type UserState = {
     message?: string;
@@ -48,7 +49,12 @@ export async function createUser(prevState: UserState, formData: FormData): Prom
     }
 
     if (username.length < 2) return { error: "Username must be at least 2 characters" };
-    if (password.length < 6) return { error: "Password must be at least 6 characters" };
+
+    // Validate password against policy
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+        return { error: passwordValidation.errors.join('、') };
+    }
 
     const isQC = formData.get("isQC") === "true";
     const isPM = formData.get("isPM") === "true";
@@ -112,7 +118,10 @@ export async function updateUser(
 
     // 2. Handle Password Update (Reset)
     if (data.password) {
-        if (data.password.length < 6) return { error: "Password must be at least 6 characters" };
+        const passwordValidation = validatePassword(data.password);
+        if (!passwordValidation.valid) {
+            return { error: passwordValidation.errors.join('、') };
+        }
         updates.password = await bcrypt.hash(data.password, 10);
     }
 
@@ -228,4 +237,50 @@ export async function deleteUser(userId: string) {
     });
 
     revalidatePath("/admin/users");
+}
+
+// --- UNLOCK USER (Admin) ---
+export async function unlockUser(userId: string): Promise<UserState> {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "ADMIN") {
+        return { error: "Unauthorized" };
+    }
+
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                failedLoginAttempts: 0,
+                lockedUntil: null,
+            },
+        });
+        revalidatePath("/admin/users");
+        return { message: "帳號已解鎖" };
+    } catch (e) {
+        console.error(e);
+        return { error: "解鎖失敗" };
+    }
+}
+
+// --- GET USERS WITH LOCK STATUS ---
+export async function getUsersWithLockStatus() {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized");
+    }
+
+    return await prisma.user.findMany({
+        select: {
+            id: true,
+            username: true,
+            role: true,
+            isQC: true,
+            isPM: true,
+            signaturePath: true,
+            createdAt: true,
+            failedLoginAttempts: true,
+            lockedUntil: true,
+        },
+        orderBy: { createdAt: "desc" },
+    });
 }

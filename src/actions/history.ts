@@ -102,10 +102,18 @@ export async function createHistoryRecord(
 
         if (fullHistory) {
             console.log('[createHistoryRecord] Calling generateQCDocument...');
+
+            // Get review chain
+            let reviewChain: any[] = [];
+            if (changeRequest.id) {
+                reviewChain = await getRequestChain(changeRequest.id);
+            }
+
             // @ts-ignore - Types compatibility
             const pdfPath = await generateQCDocument({
                 ...fullHistory,
-                submissionDate: changeRequest.createdAt
+                submissionDate: changeRequest.createdAt,
+                reviewChain
             }, item);
             console.log('[createHistoryRecord] PDF generated at:', pdfPath);
 
@@ -169,10 +177,34 @@ export async function getItemHistory(itemId: number) {
 }
 
 /**
+ * Get the chain of previous change requests for a given request ID
+ */
+export async function getRequestChain(requestId: number) {
+    const chain: any[] = [];
+    let currentId: number | null = requestId;
+
+    while (currentId) {
+        const req: any = await prisma.changeRequest.findUnique({
+            where: { id: currentId },
+            include: {
+                submittedBy: { select: { username: true } },
+                reviewedBy: { select: { username: true } }
+            }
+        });
+
+        if (!req) break;
+        chain.push(req);
+        currentId = (req as any).previousRequestId;
+    }
+
+    return chain;
+}
+
+/**
  * Get detailed history record
  */
 export async function getHistoryDetail(historyId: number) {
-    return await prisma.itemHistory.findUnique({
+    const history = await prisma.itemHistory.findUnique({
         where: { id: historyId },
         include: {
             submittedBy: { select: { username: true } },
@@ -181,11 +213,32 @@ export async function getHistoryDetail(historyId: number) {
             qcApproval: {
                 include: {
                     qcApprovedBy: { select: { username: true } },
-                    pmApprovedBy: { select: { username: true } }
+                    pmApprovedBy: { select: { username: true } },
+                    revisions: {
+                        orderBy: { revisionNumber: "asc" },
+                        include: {
+                            requestedBy: { select: { username: true } }
+                        }
+                    }
                 }
             }
         }
     });
+
+    if (!history) return null;
+
+    // Fetch the FULL chain of ChangeRequests for this ItemHistory
+    // The entire review cycle (submit -> reject -> resubmit -> approve) 
+    // should be displayed as one unified flow
+    let reviewChain: any[] = [];
+    if (history.changeRequestId) {
+        reviewChain = await getRequestChain(history.changeRequestId);
+    }
+
+    return {
+        ...history,
+        reviewChain
+    };
 }
 
 
@@ -378,8 +431,116 @@ export async function getIsoDocuments() {
         include: {
             item: { select: { fullId: true, title: true } },
             submittedBy: { select: { username: true } },
-            reviewedBy: { select: { username: true } }
+            reviewedBy: { select: { username: true } },
+            qcApproval: { select: { status: true } }
         }
     });
 }
 
+/**
+ * Get ISO docs grouped by project with stats (supports search)
+ */
+export async function getIsoDocsGroupedByProject(query?: string) {
+    const whereProject: Prisma.ProjectWhereInput = {};
+    const whereHistory: Prisma.ItemHistoryWhereInput = { isoDocPath: { not: null } };
+
+    if (query) {
+        const lowerQuery = query.toLowerCase();
+        // If query exists, we want projects that MATCH the query OR contain docs matching the query
+        // BUT straightforward approach:
+        // Find projects where Title/Code matches query
+        // OR projects where they have ItemHistory matching query
+
+        // Let's broaden relation filter
+        whereProject.OR = [
+            { title: { contains: query, mode: 'insensitive' } },
+            { codePrefix: { contains: query, mode: 'insensitive' } },
+            {
+                itemHistories: {
+                    some: {
+                        isoDocPath: { not: null },
+                        OR: [
+                            { itemFullId: { contains: query, mode: 'insensitive' } },
+                            { itemTitle: { contains: query, mode: 'insensitive' } }
+                        ]
+                    }
+                }
+            }
+        ];
+    }
+
+    // Get all projects that have ISO docs (and match query if provided)
+    const projects = await prisma.project.findMany({
+        where: whereProject,
+        include: {
+            itemHistories: {
+                where: whereHistory,
+                select: { id: true, createdAt: true },
+                orderBy: { createdAt: 'desc' }
+            }
+        }
+    });
+
+    return projects
+        .filter(p => p.itemHistories.length > 0)
+        .map(p => ({
+            id: p.id,
+            title: p.title,
+            codePrefix: p.codePrefix,
+            isoDocCount: p.itemHistories.length,
+            lastUpdated: p.itemHistories[0]?.createdAt || null
+        }))
+        .sort((a, b) => {
+            if (!a.lastUpdated) return 1;
+            if (!b.lastUpdated) return -1;
+            return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
+        });
+}
+
+/**
+ * Get ISO documents for a specific project
+ */
+export async function getIsoDocumentsByProject(projectId: number) {
+    return await prisma.itemHistory.findMany({
+        where: {
+            projectId,
+            isoDocPath: { not: null }
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+            item: { select: { fullId: true, title: true } },
+            submittedBy: { select: { username: true } },
+            reviewedBy: { select: { username: true } },
+            qcApproval: { select: { status: true, revisionCount: true } }
+        }
+    });
+}
+
+/**
+ * Get recent ISO document updates (supports search)
+ */
+export async function getRecentIsoDocUpdates(limit = 50, query?: string) {
+    const where: Prisma.ItemHistoryWhereInput = { isoDocPath: { not: null } };
+
+    if (query) {
+        where.OR = [
+            { itemFullId: { contains: query, mode: 'insensitive' } },
+            { itemTitle: { contains: query, mode: 'insensitive' } },
+            { project: { title: { contains: query, mode: 'insensitive' } } },
+            { project: { codePrefix: { contains: query, mode: 'insensitive' } } }
+        ];
+    }
+
+    return await prisma.itemHistory.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: {
+            project: { select: { title: true, codePrefix: true } },
+            item: { select: { fullId: true, title: true } },
+            submittedBy: { select: { username: true } },
+            reviewedBy: { select: { username: true } },
+            qcApproval: { select: { status: true, revisionCount: true } }
+        }
+    });
+}

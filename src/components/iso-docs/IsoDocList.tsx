@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
+import { formatDate } from '@/lib/date-utils';
 
 type IsoDoc = {
     id: number;
@@ -13,6 +15,10 @@ type IsoDoc = {
     submitterName?: string | null;  // Fallback when user is deleted
     reviewedBy: { username: string } | null;
     item?: { fullId: string; title: string } | null;
+    qcApproval?: {
+        status: string;
+        revisionCount: number;
+    } | null;
 };
 
 type SortKey = 'itemFullId' | 'itemTitle' | 'version' | 'createdAt' | 'submittedBy';
@@ -109,6 +115,9 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
                             <th style={thStyle} onClick={() => handleSort('submittedBy')}>
                                 提交 / 核准 {getSortIcon('submittedBy')}
                             </th>
+                            <th style={{ ...thStyle, textAlign: 'center' }}>
+                                狀態
+                            </th>
                             <th style={thStyle}>
                                 下載
                             </th>
@@ -126,13 +135,12 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
                             >
                                 <td style={{ padding: '0.75rem 1rem' }}>
-                                    <span style={{
-                                        fontFamily: 'var(--font-geist-mono)',
-                                        color: 'var(--color-primary)',
-                                        fontWeight: 600
-                                    }}>
+                                    <Link
+                                        href={`/admin/history/detail/${doc.id}`}
+                                        className="text-primary hover:underline font-mono"
+                                    >
                                         {doc.item?.fullId || doc.itemFullId}
-                                    </span>
+                                    </Link>
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem' }}>
                                     <div style={{
@@ -157,13 +165,60 @@ export default function IsoDocList({ docs }: { docs: IsoDoc[] }) {
                                     </span>
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--color-text-muted)' }}>
-                                    {new Date(doc.createdAt).toLocaleDateString()}
+                                    {formatDate(doc.createdAt)}
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem' }}>
                                     <div>{doc.submittedBy?.username || doc.submitterName || '(已刪除)'}</div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                                         {doc.reviewedBy?.username || '-'}
                                     </div>
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                                    {doc.qcApproval?.status === 'REVISION_REQUIRED' ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                            <span style={{
+                                                padding: '0.2rem 0.5rem',
+                                                backgroundColor: 'rgba(249, 168, 37, 0.15)',
+                                                color: '#d97706',
+                                                borderRadius: '12px',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 600,
+                                                border: '1px solid rgba(249, 168, 37, 0.3)'
+                                            }}>
+                                                待修訂
+                                            </span>
+                                            {doc.qcApproval.revisionCount > 0 && (
+                                                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                                                    (修訂 {doc.qcApproval.revisionCount} 次)
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : doc.qcApproval?.status === 'REJECTED' ? (
+                                        <span style={{
+                                            padding: '0.2rem 0.5rem',
+                                            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                            color: '#ef4444',
+                                            borderRadius: '12px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600,
+                                            border: '1px solid rgba(239, 68, 68, 0.3)'
+                                        }}>
+                                            已退回
+                                        </span>
+                                    ) : doc.qcApproval?.status === 'COMPLETED' ? (
+                                        <span style={{
+                                            padding: '0.2rem 0.5rem',
+                                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                            color: '#10b981',
+                                            borderRadius: '12px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600
+                                        }}>
+                                            已完成
+                                        </span>
+                                    ) : (
+                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>-</span>
+                                    )}
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem' }}>
                                     {doc.isoDocPath ? (

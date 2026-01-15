@@ -7,6 +7,8 @@ declare module "next-auth" {
             id: string;
             role: string;
             username: string;
+            isPM: boolean;
+            isQC: boolean;
         } & DefaultSession["user"];
     }
 
@@ -14,6 +16,8 @@ declare module "next-auth" {
         id: string;
         role: string;
         username: string;
+        isPM: boolean;
+        isQC: boolean;
     }
 }
 
@@ -22,5 +26,8 @@ declare module "next-auth/jwt" {
         id: string;
         role: string;
         username: string;
+        isPM: boolean;
+        isQC: boolean;
     }
 }
+

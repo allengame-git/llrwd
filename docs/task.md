@@ -1,6 +1,6 @@
 # 專案項目資訊管理系統 - 開發進度 (task.md)
 
->> 最後更新: 2026-01-07
+>> 最後更新: 2026-01-12
 
 ## 進度總覽
 
@@ -14,6 +14,10 @@
 | Phase 6 | 部署準備與優化 | ✅ 完成 |
 | Phase 7 | 品質文件數位簽章 | ✅ 完成 |
 | Phase 8 | UI/UX 優化與強化 | ✅ 完成 |
+| Phase 9 | 管理員自我編輯功能 | ✅ 完成 |
+| Phase 10 | 品質文件 PDF 優化 | ✅ 完成 |
+| Phase 11 | 變更申請退回優化 | ✅ 完成 |
+| Phase 12 | ISO 文件頁面優化 | ✅ 完成 |
 
 ---
 
@@ -201,25 +205,108 @@
 
 ---
 
-## 已完成功能總覽
+## Phase 10: 品質文件 PDF 優化 (v1.2.0) ✅
 
-- ✅ 專案與項目 CRUD
-- ✅ 階層式項目結構 (無限層級)
-- ✅ 自動編號系統
-- ✅ 審核流程 (CREATE/UPDATE/DELETE)
-- ✅ 四層權限控管
-- ✅ 富文本編輯器 (含圖片、表格)
-- ✅ 檔案附件管理
-- ✅ 檔案管理系統 (獨立模組)
-- ✅ 拖放上傳
-- ✅ 專案搜尋 (關鍵字高亮)
-- ✅ 項目歷史與版本比較
-- ✅ 全域變更歷史 Dashboard
-- ✅ ISO 品質文件生成
-- ✅ 品質文件數位簽章 (QC/PM 兩階段審核)
-- ✅ PDF 內容截圖渲染 (Puppeteer)
-- ✅ 中文化介面
-- ✅ Docker 部署配置
-- ✅ Infographic 風格首頁儀表板
-- ✅ 歷史記錄側邊欄 Accordion 效果
-- ✅ 詳細審查紀錄資訊顯示
+### Phase 10.1: PDF 結構優化 ✅
+
+- [x] 移除舊版文字預覽，改為標準化表單
+- [x] 強制單一檔案策略 (`QC-[Project]-[ID].pdf`)
+- [x] PDF 內含詳細簽核資訊 (提交者/核准者/QC/PM)
+
+### Phase 10.2: 內容附件截圖 ✅
+
+- [x] PM 核准後自動截圖完整歷史頁面 (Puppeteer)
+- [x] 包含 Diff 變更比對與 Snapshot 內容
+- [x] 使用 `pdf-lib` 合併 PDF 頁面
+
+### Phase 10.3: 審核流程優化 ✅
+
+- [x] 簽核意見自動填入「同意」(審查者/QC/PM)
+- [x] Next.js Config 設定 `serverComponentsExternalPackages`
+
+---
+
+## Phase 11: 變更申請退回優化 (v1.3.0) ✅
+
+### Phase 11.1: 待修改申請管理 ✅
+
+- [x] 建立 `/admin/rejected-requests` 列表頁
+- [x] 建立編輯與重新提交頁面 (自動帶入舊資料)
+- [x] 支援關聯項目 (Related Items) 帶入與編輯
+
+### Phase 11.2: 流程整合 ✅
+
+- [x] 重新提交後自動清除原退回項目 (狀態更新)
+- [x] Navbar 新增「待修改」計數 Badge
+- [x] API `/api/rejected-count` 實作
+
+---
+
+## Phase 12: ISO 文件頁面優化 (v1.4.0) ✅
+
+### Phase 12.1: 頁面結構重構 ✅
+
+- [x] **分組顯示**: `/iso-docs` 改為依專案分組顯示
+- [x] **統計資訊**: 顯示專案文件數量與最後更新時間
+- [x] **專案詳情頁**: 新增 `/iso-docs/[projectId]` 頁面
+
+### Phase 12.2: 最近更新紀錄 ✅
+
+- [x] 新增「最近更新紀錄」區塊 (顯示最新 50 筆)
+- [x] 顯示詳細狀態 (待修訂、待 QC/PM 審核、已核准等)
+- [x] 支援顯示修訂次數 (Revision Count)
+- [x] 新增「下載」按鈕欄位，直接連結 PDF 檔案
+
+### Phase 12.3: 搜尋功能 ✅
+
+- [x] 新增全域搜尋 (關鍵字: 文件編號、標題、專案)
+- [x] Client Side Search Component (`IsoDocSearch`)
+- [x] 整合至專案列表與最近更新紀錄篩選
+
+---
+
+## Phase 13: 系統全面中文化與 UI 現代化 (v1.5.0) ✅
+
+### Phase 13.1: 頁面中文化 ✅
+
+- [x] `/projects` 專案列表頁 (標題、描述、按鈕、Modal)
+- [x] `/admin/users` 使用者管理頁 (表格、欄位、Modal、錯誤訊息)
+- [x] `/admin/rejected-requests` 待修改申請頁
+- [x] Login 頁面 ("會員登入" -> "使用者登入")
+
+### Phase 13.2: Bento Grid 首頁改版 ✅
+
+- [x] 採用現代化 Bento Grid 佈局 (5 Card Layout)
+- [x] 整合工業風黑白攝影 (Drone, Tunnel, Coast)
+- [x] 資料視覺化 (Stat Cards, Pending Actions List)
+- [x] 移除多餘遮罩與干擾元素，優化閱讀體驗
+
+---
+
+## Phase 14: 變更申請取消流程 (v1.6.0) ✅
+
+### Phase 14.1: 取消申請功能 ✅
+
+- [x] Server Action: `cancelRejectedRequest` (支援權限檢查)
+- [x] UI Component: `CancelRequestButton` (Client Component)
+- [x] 整合至 `/admin/rejected-requests` 頁面
+- [x] 權限邏輯: 僅限原提交者或 Admin 可執行
+
+---
+
+## Phase 15: 系統備份與復原 (v1.7.0) ✅
+
+### Phase 15.1: 備份功能 ✅
+
+- [x] 資料庫備份 (PostgreSQL SQL Export)
+- [x] 檔案備份 (Uploads, ISO Docs ZIP)
+- [x] 管理者備份介面 (Admin Dashboard UI)
+- [x] 串流下載 (Stream Response)
+
+### Phase 15.2: 復原功能 ✅
+
+- [x] 資料庫復原 (SQL Import with Session Validation)
+- [x] 檔案復原 (ZIP Extract)
+- [x] 進度條與狀態顯示 (Progress Bar)
+- [x] 備份檔案完整性檢查
+- [x] 復原完成後自動登出機制

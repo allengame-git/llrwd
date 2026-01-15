@@ -10,14 +10,14 @@ export default async function ProjectsPage() {
     const session = await getServerSession(authOptions);
     const projects = await getProjects();
 
-    const canEdit = session?.user.role === "ADMIN" || session?.user.role === "INSPECTOR";
+    const canEdit = session?.user.role === "ADMIN" || session?.user.isPM === true;
 
     return (
         <div className="container" style={{ paddingBottom: "4rem" }}>
             <header style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                    <h1 style={{ fontSize: "2rem" }}>Projects</h1>
-                    <p style={{ color: "var(--color-text-muted)" }}>Manage your projects and items</p>
+                    <h1 style={{ fontSize: "2rem" }}>專案管理</h1>
+                    <p style={{ color: "var(--color-text-muted)" }}>管理您的專案與項目</p>
                 </div>
             </header>
 

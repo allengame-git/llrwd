@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { formatDate } from '@/lib/date-utils';
 
 type DataFile = {
     id: number;
@@ -341,7 +342,7 @@ export default function DataFileList({
                                     <td style={tdStyle}>{file.author}</td>
                                     <td style={tdStyle}>{formatFileSize(file.fileSize)}</td>
                                     <td style={{ ...tdStyle, color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-                                        {new Date(file.createdAt).toLocaleDateString('zh-TW')}
+                                        {formatDate(file.createdAt)}
                                     </td>
                                     <td style={tdStyle}>
                                         {file.hasPendingRequest ? (

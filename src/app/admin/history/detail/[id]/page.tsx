@@ -1,6 +1,7 @@
 import { getHistoryDetail, ItemSnapshot } from "@/actions/history";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import ReviewProcessTimeline from "@/components/approval/ReviewProcessTimeline";
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
         if (!attachmentsJson) return null;
         try {
             const files = JSON.parse(attachmentsJson) as { name: string; path: string; size: number; uploadedAt: string }[];
-            if (files.length === 0) return <span style={{ color: 'gray', fontStyle: 'italic' }}>No attachments</span>;
+            if (files.length === 0) return <span style={{ color: 'gray', fontStyle: 'italic' }}>無參考文獻</span>;
             return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {files.map((file, index) => (
@@ -209,141 +210,24 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                     </div>
                 </div>
 
-                {/* Review Details Card */}
-                <div style={{
-                    marginTop: '1.5rem',
-                    background: 'rgba(0,131,143,0.03)',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--color-border)',
-                    overflow: 'hidden'
-                }}>
-                    <div style={{
-                        padding: '0.75rem 1rem',
-                        background: 'var(--color-primary)',
-                        color: 'white',
-                        fontWeight: 600,
-                        fontSize: '0.9rem'
-                    }}>
-                        📋 審查紀錄詳情
-                    </div>
-                    <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                        {/* Submitter Info */}
-                        <div style={{ borderLeft: '3px solid var(--chart-2)', paddingLeft: '1rem' }}>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                                提交者
-                            </div>
-                            <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text-main)' }}>
-                                {record.submittedBy?.username || record.submitterName || '(已刪除)'}
-                            </div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                                {new Date(record.createdAt).toLocaleString('zh-TW')}
-                            </div>
-                            {record.submitReason && (
-                                <div style={{
-                                    marginTop: '0.75rem',
-                                    padding: '0.5rem 0.75rem',
-                                    backgroundColor: 'rgba(0,0,0,0.03)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '0.85rem'
-                                }}>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem', fontWeight: 'bold' }}>編輯原因</div>
-                                    {record.submitReason}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Reviewer Info */}
-                        <div style={{ borderLeft: '3px solid var(--color-success)', paddingLeft: '1rem' }}>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                                核准者
-                            </div>
-                            <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text-main)' }}>
-                                {record.reviewedBy?.username || record.reviewerName || '-'}
-                            </div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                                {record.reviewedBy ? new Date(record.createdAt).toLocaleString('zh-TW') : '-'}
-                            </div>
-                            {record.reviewNote && (
-                                <div style={{
-                                    marginTop: '0.75rem',
-                                    padding: '0.5rem 0.75rem',
-                                    backgroundColor: 'rgba(0,0,0,0.03)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '0.85rem'
-                                }}>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem', fontWeight: 'bold' }}>審查意見</div>
-                                    {record.reviewNote}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* QC Approval Info */}
-                        <div style={{ borderLeft: '3px solid var(--chart-4)', paddingLeft: '1rem' }}>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                                QC 簽核
-                            </div>
-                            {record.qcApproval?.qcApprovedBy ? (
-                                <>
-                                    <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text-main)' }}>
-                                        {record.qcApproval.qcApprovedBy.username}
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                                        {record.qcApproval.qcApprovedAt ? new Date(record.qcApproval.qcApprovedAt).toLocaleString('zh-TW') : '-'}
-                                    </div>
-                                </>
-                            ) : (
-                                <div style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>
-                                    {record.qcApproval ? (record.qcApproval.status === 'PENDING_QC' ? '待 QC 簽核' : '-') : '不適用'}
-                                </div>
-                            )}
-                            {record.qcApproval?.qcNote && (
-                                <div style={{
-                                    marginTop: '0.75rem',
-                                    padding: '0.5rem 0.75rem',
-                                    backgroundColor: 'rgba(0,0,0,0.03)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '0.85rem'
-                                }}>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem', fontWeight: 'bold' }}>QC 審查意見</div>
-                                    {record.qcApproval.qcNote}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* PM Approval Info */}
-                        <div style={{ borderLeft: '3px solid var(--chart-1)', paddingLeft: '1rem' }}>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                                PM 簽核
-                            </div>
-                            {record.qcApproval?.pmApprovedBy ? (
-                                <>
-                                    <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text-main)' }}>
-                                        {record.qcApproval.pmApprovedBy.username}
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                                        {record.qcApproval.pmApprovedAt ? new Date(record.qcApproval.pmApprovedAt).toLocaleString('zh-TW') : '-'}
-                                    </div>
-                                </>
-                            ) : (
-                                <div style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>
-                                    {record.qcApproval ? (record.qcApproval.status === 'PENDING_PM' ? '待 PM 簽核' : record.qcApproval.status === 'PENDING_QC' ? '等待 QC' : '-') : '不適用'}
-                                </div>
-                            )}
-                            {record.qcApproval?.pmNote && (
-                                <div style={{
-                                    marginTop: '0.75rem',
-                                    padding: '0.5rem 0.75rem',
-                                    backgroundColor: 'rgba(0,0,0,0.03)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '0.85rem'
-                                }}>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem', fontWeight: 'bold' }}>PM 審查意見</div>
-                                    {record.qcApproval.pmNote}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                {/* Review Details Timeline */}
+                <ReviewProcessTimeline
+                    submittedBy={record.submittedBy?.username || record.submitterName || '(已刪除)'}
+                    submittedAt={record.createdAt}
+                    submitReason={record.submitReason}
+                    reviewedBy={record.reviewedBy?.username || record.reviewerName}
+                    reviewedAt={record.createdAt} // Close enough for generic history
+                    reviewNote={record.reviewNote}
+                    qcApprovedBy={record.qcApproval?.qcApprovedBy?.username}
+                    qcApprovedAt={record.qcApproval?.qcApprovedAt}
+                    qcNote={record.qcApproval?.qcNote}
+                    pmApprovedBy={record.qcApproval?.pmApprovedBy?.username}
+                    pmApprovedAt={record.qcApproval?.pmApprovedAt}
+                    pmNote={record.qcApproval?.pmNote}
+                    revisions={(record.qcApproval as any)?.revisions}
+                    currentStatus={record.qcApproval?.status}
+                    reviewChain={(record as any).reviewChain}
+                />
             </div>
 
 
@@ -380,7 +264,7 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
 
                     {previousSnapshot.attachments && (
                         <div style={{ marginBottom: '2rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>附件</label>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>參考文獻</label>
                             {renderAttachments(previousSnapshot.attachments)}
                         </div>
                     )}
@@ -416,27 +300,27 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
                     </h3>
 
                     <div style={{ marginBottom: '2rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>TITLE</label>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>標題</label>
                         <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>{snapshot.title}</div>
                     </div>
 
                     <div style={{ marginBottom: '2rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>CONTENT</label>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>內容</label>
                         <div className="rich-text-content" style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.5)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}
-                            dangerouslySetInnerHTML={{ __html: snapshot.content || '<span style="color:gray;font-style:italic">No content</span>' }}
+                            dangerouslySetInnerHTML={{ __html: snapshot.content || '<span style="color:gray;font-style:italic">無內容</span>' }}
                         />
                     </div>
 
                     {snapshot.attachments && (
                         <div style={{ marginBottom: '2rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>ATTACHMENTS</label>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>參考文獻</label>
                             {renderAttachments(snapshot.attachments)}
                         </div>
                     )}
 
                     {snapshot.relatedItems && snapshot.relatedItems.length > 0 && (
                         <div style={{ marginBottom: '2rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>RELATED ITEMS</label>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>關聯項目</label>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {snapshot.relatedItems.map(ri => (
                                     <div key={ri.id} style={{ padding: '0.5rem', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'rgba(255,255,255,0.3)' }}>

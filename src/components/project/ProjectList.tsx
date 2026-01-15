@@ -4,6 +4,8 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import EditProjectButton from "./EditProjectButton";
 import DeleteProjectButton from "./DeleteProjectButton";
+import CopyProjectButton from "./CopyProjectButton";
+import { formatDate } from "@/lib/date-utils";
 
 type Project = {
     id: number;
@@ -20,12 +22,12 @@ type Project = {
 export default function ProjectList({ projects }: { projects: Project[] }) {
     const { data: session } = useSession();
 
-    const canEdit = session?.user.role === "ADMIN" || session?.user.role === "INSPECTOR";
+    const canEdit = session?.user.role === "ADMIN" || session?.user.isPM === true;
 
     if (projects.length === 0) {
         return (
             <div style={{ textAlign: "center", padding: "3rem", color: "var(--color-text-muted)" }}>
-                <p>No projects found. Create one to get started.</p>
+                <p>找不到專案。請建立一個新專案以開始。</p>
             </div>
         );
     }
@@ -47,7 +49,10 @@ export default function ProjectList({ projects }: { projects: Project[] }) {
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             {canEdit && (
-                                <EditProjectButton project={project} />
+                                <>
+                                    <CopyProjectButton project={project} />
+                                    <EditProjectButton project={project} />
+                                </>
                             )}
                             {session?.user.role === "ADMIN" && (
                                 <DeleteProjectButton project={project} />
@@ -56,12 +61,12 @@ export default function ProjectList({ projects }: { projects: Project[] }) {
                     </div>
 
                     <p style={{ color: "var(--color-text-muted)", fontSize: "0.95rem", flex: 1 }}>
-                        {project.description || "No description"}
+                        {project.description || "無描述"}
                     </p>
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem", fontSize: "0.85rem", color: "var(--color-text-muted)" }}>
-                        <span>{project._count.items} Items</span>
-                        <span>{new Date(project.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
+                        <span>{project._count.items} 個項目</span>
+                        <span>{formatDate(project.updatedAt)}</span>
                     </div>
                 </div>
             ))}

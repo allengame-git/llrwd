@@ -30,6 +30,16 @@ interface ItemHistory {
     pmNote?: string | null;
     pmDate?: Date | null;
     pmUser?: string | null;
+
+    // Revision History (for PDF generation)
+    revisions?: Array<{
+        revisionNumber: number;
+        requestedBy?: { username: string } | null;
+        requestedAt: Date;
+        requestNote: string;
+        resolvedAt?: Date | null;
+    }>;
+    reviewChain?: any[]; // For generic change requests
 }
 
 interface Item {
@@ -69,19 +79,72 @@ const generateHistoryPagePDF = async (history: ItemHistory): Promise<Uint8Array 
             if (!diff) return '';
             let html = '<div class="section"><h2>變更內容比對</h2>';
 
+            // Helper to render relatedItems as formatted list
+            const renderRelatedItems = (items: any[] | null) => {
+                if (!items || items.length === 0) return '<em>(無關聯項目)</em>';
+                return items.map(item => `
+                    <div style="padding: 8px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px; background: rgba(255,255,255,0.5);">
+                        <strong style="color: #00838f;">${item.fullId || ''}</strong>
+                        ${item.title ? ` - ${item.title}` : ''}
+                        ${item.description ? `<div style="font-size: 12px; color: #666; margin-top: 4px;">${item.description}</div>` : ''}
+                    </div>
+                `).join('');
+            };
+
             for (const [key, value] of Object.entries(diff) as [string, any][]) {
-                const label = key === 'content' ? '內容' : key === 'title' ? '標題' : key;
+                const label = key === 'content' ? '內容'
+                    : key === 'title' ? '標題'
+                        : key === 'relatedItems' ? '關聯項目'
+                            : key === 'attachments' ? '參考文獻'
+                                : key;
+
+                // Determine how to render the content based on field type
+                let oldContent: string;
+                let newContent: string;
+
+                if (key === 'content') {
+                    oldContent = value.old || '<em>(空白)</em>';
+                    newContent = value.new || '<em>(空白)</em>';
+                } else if (key === 'relatedItems') {
+                    oldContent = renderRelatedItems(value.old);
+                    newContent = renderRelatedItems(value.new);
+                } else if (key === 'attachments') {
+                    // Handle attachments/references - show file names
+                    const renderAttachments = (attachments: any) => {
+                        if (!attachments) return '<em>(無參考文獻)</em>';
+                        try {
+                            const files = typeof attachments === 'string' ? JSON.parse(attachments) : attachments;
+                            if (!Array.isArray(files) || files.length === 0) return '<em>(無參考文獻)</em>';
+                            return files.map((f: any) => `
+                                <div style="padding: 4px 8px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;">
+                                    📎 ${f.name || f.dataName || f.fileName || '未命名'}
+                                    ${f.author ? `<span style="color: #666; font-size: 12px;"> - ${f.author}</span>` : ''}
+                                    ${f.citation ? `<div style="font-size: 11px; color: #888; margin-top: 2px;">${f.citation}</div>` : ''}
+                                </div>
+                            `).join('');
+                        } catch {
+                            return '<em>(無參考文獻)</em>';
+                        }
+                    };
+                    oldContent = renderAttachments(value.old);
+                    newContent = renderAttachments(value.new);
+                } else {
+                    // Default: stringify other values
+                    oldContent = typeof value.old === 'object' ? JSON.stringify(value.old, null, 2) : String(value.old ?? '');
+                    newContent = typeof value.new === 'object' ? JSON.stringify(value.new, null, 2) : String(value.new ?? '');
+                }
+
                 html += `
                     <div class="diff-row">
                         <div class="diff-header">${label}</div>
                         <div class="diff-grid">
                             <div class="diff-old">
                                 <div class="diff-label error">修改前</div>
-                                <div class="content-box">${key === 'content' ? (value.old || '<em>(空白)</em>') : JSON.stringify(value.old)}</div>
+                                <div class="content-box">${oldContent}</div>
                             </div>
                             <div class="diff-new">
                                 <div class="diff-label success">修改後</div>
-                                <div class="content-box">${key === 'content' ? (value.new || '<em>(空白)</em>') : JSON.stringify(value.new)}</div>
+                                <div class="content-box">${newContent}</div>
                             </div>
                         </div>
                     </div>
@@ -91,9 +154,145 @@ const generateHistoryPagePDF = async (history: ItemHistory): Promise<Uint8Array 
             return html;
         };
 
+        // Helper to render Review Timeline (Round-based)
+        const renderReviewTimeline = () => {
+            const rounds: any[][] = [];
+
+            // 1. Process reviewChain (Generic requests)
+            if (history.reviewChain && history.reviewChain.length > 0) {
+                const sortedChain = [...history.reviewChain].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                for (const req of sortedChain) {
+                    const roundEvents: any[] = [];
+                    roundEvents.push({
+                        type: req.previousRequestId ? "重新提交" : "提交",
+                        user: req.submittedBy?.username || req.submitterName || "提交者",
+                        date: new Date(req.createdAt),
+                        note: req.submitReason,
+                        status: "info"
+                    });
+                    if (req.status === "APPROVED" && req.reviewedBy) {
+                        roundEvents.push({
+                            type: "核准",
+                            user: req.reviewedBy.username,
+                            date: new Date(req.updatedAt),
+                            note: req.reviewNote,
+                            status: "success"
+                        });
+                    } else if ((req.status === "REJECTED" || req.status === "RESUBMITTED") && req.reviewedBy) {
+                        roundEvents.push({
+                            type: "退回修改",
+                            user: req.reviewedBy.username,
+                            date: new Date(req.updatedAt),
+                            note: req.reviewNote,
+                            status: "danger"
+                        });
+                    }
+                    rounds.push(roundEvents);
+                }
+            } else {
+                // Fallback for direct ISO flow without previous chain records
+                rounds.push([{
+                    type: "提交",
+                    user: history.submittedBy?.username || "提交者",
+                    date: new Date(history.submissionDate || history.createdAt),
+                    note: history.submitReason,
+                    status: "info"
+                }]);
+                if (history.reviewedBy) {
+                    rounds[0].push({
+                        type: "核准",
+                        user: history.reviewedBy.username,
+                        date: new Date(history.createdAt),
+                        note: history.reviewNote,
+                        status: "success"
+                    });
+                }
+            }
+
+            // Append QC/PM to last round
+            const lastRound = rounds[rounds.length - 1] || [];
+            if (history.qcUser && history.qcDate) {
+                lastRound.push({ type: "QC 簽核", user: history.qcUser, date: new Date(history.qcDate), note: history.qcNote, status: "success" });
+            }
+            if (history.pmUser && history.pmDate) {
+                lastRound.push({ type: "PM 簽核", user: history.pmUser, date: new Date(history.pmDate), note: history.pmNote, status: "success" });
+            }
+
+            // 2. Process Revisions (ISO flow)
+            if (history.revisions && history.revisions.length > 0) {
+                for (const rev of history.revisions) {
+                    const revRound: any[] = [];
+                    revRound.push({
+                        type: "退回修改",
+                        user: rev.requestedBy?.username || "審核者",
+                        date: new Date(rev.requestedAt),
+                        note: rev.requestNote,
+                        status: "warning"
+                    });
+                    if (rev.resolvedAt) {
+                        revRound.push({
+                            type: "重新提交",
+                            user: history.submittedBy?.username || "提交者",
+                            date: new Date(rev.resolvedAt),
+                            note: `完成第 ${rev.revisionNumber} 次修訂`,
+                            status: "info"
+                        });
+                    }
+                    rounds.push(revRound);
+                }
+            }
+
+            if (rounds.length === 0) return '';
+
+            let html = '<div class="section"><h2>審核歷程時間軸</h2><div class="timeline-container">';
+            rounds.forEach((round, idx) => {
+                html += `<div class="timeline-round">`;
+                html += `<div class="round-title">第 ${idx + 1} 次審核</div>`;
+                round.forEach(ev => {
+                    const color = ev.status === 'success' ? '#10b981' : ev.status === 'warning' ? '#f59e0b' : ev.status === 'danger' ? '#ef4444' : '#3b82f6';
+                    html += `
+                        <div class="timeline-event">
+                            <div class="event-dot" style="background: ${color}"></div>
+                            <div class="event-content">
+                                <div class="event-header">
+                                    <span class="event-type" style="color: ${color}; border-color: ${color}40; background: ${color}15">${ev.type}</span>
+                                    <span class="event-user">${ev.user}</span>
+                                </div>
+                                <div class="event-date">${new Date(ev.date).toLocaleString('zh-TW')}</div>
+                                ${ev.note ? `<div class="event-note">${(ev.type === '提交' || ev.type === '重新提交') ? '原因：' : '意見：'}${ev.note}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            });
+            html += '</div></div>';
+            return html;
+        };
+
         // Helper to render Snapshot Section
         const renderSnapshotSection = (title: string, data: any) => {
             if (!data) return '';
+
+            // Helper to format attachments/references
+            const formatAttachments = (attachments: any) => {
+                if (!attachments) return '';
+                try {
+                    const files = typeof attachments === 'string' ? JSON.parse(attachments) : attachments;
+                    if (!Array.isArray(files) || files.length === 0) return '';
+                    const fileList = files.map((f: any) => `
+                        <div style="padding: 6px 10px; margin: 4px 0; background: #f5f5f5; border-radius: 4px; border-left: 3px solid #00838f;">
+                            📎 ${f.name || f.dataName || f.fileName || '未命名檔案'}
+                            ${f.author ? `<span style="color: #666; font-size: 12px;"> - ${f.author}</span>` : ''}
+                            ${f.citation ? `<div style="font-size: 12px; color: #666; margin-top: 2px;">${f.citation}</div>` : ''}
+                        </div>
+                    `).join('');
+                    return `<div class="field-group"><label>參考文獻</label><div class="value">${fileList}</div></div>`;
+                } catch {
+                    return '';
+                }
+            };
+
             return `
                 <div class="section">
                     <h2>${title}</h2>
@@ -105,10 +304,11 @@ const generateHistoryPagePDF = async (history: ItemHistory): Promise<Uint8Array 
                         <label>內容</label>
                         <div class="value rich-text">${data.content || '(無內容)'}</div>
                     </div>
-                     ${data.attachments ? `<div class="field-group"><label>附件 (JSON)</label><pre>${data.attachments}</pre></div>` : ''}
+                    ${formatAttachments(data.attachments)}
                 </div>
              `;
         };
+
 
         const htmlContent = `
             <!DOCTYPE html>
@@ -148,6 +348,22 @@ const generateHistoryPagePDF = async (history: ItemHistory): Promise<Uint8Array 
                     table { width: 100%; border-collapse: collapse; margin: 10px 0; }
                     th, td { border: 1px solid #ddd; padding: 6px; }
                     img { max-width: 100%; }
+                    
+                    .revision-table { font-size: 12px; }
+                    .revision-table th { background: #f5f5f5; font-weight: 600; }
+                    .revision-table td { vertical-align: top; }
+
+                    /* Timeline Styles */
+                    .timeline-container { display: block; }
+                    .timeline-round { border: 1px dashed #ddd; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #fff; }
+                    .round-title { font-size: 12px; font-weight: bold; color: #666; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                    .timeline-event { position: relative; padding-left: 20px; border-left: 2px solid #eee; margin-bottom: 15px; }
+                    .event-dot { position: absolute; left: -6px; top: 4px; width: 10px; height: 10px; borderRadius: 50%; border: 2px solid #fff; }
+                    .event-header { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+                    .event-type { font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 600; border: 1px solid; }
+                    .event-user { font-weight: bold; font-size: 13px; }
+                    .event-date { font-size: 11px; color: #888; margin-bottom: 3px; }
+                    .event-note { font-size: 12px; background: #f9f9f9; padding: 6px 10px; border-radius: 4px; border: 1px solid #eee; }
                 </style>
             </head>
             <body>
@@ -156,34 +372,9 @@ const generateHistoryPagePDF = async (history: ItemHistory): Promise<Uint8Array 
                     ${history.itemFullId} - ${history.itemTitle} | 變更類型: ${history.changeType}
                 </div>
 
-                <div class="review-card">
-                    <div class="review-col submitter">
-                        <div class="label">提交者</div>
-                        <div class="value">${history.submittedBy?.username || '(已刪除)'}</div>
-                        <div class="date">${new Date(history.createdAt).toLocaleString('zh-TW')}</div>
-                        ${history.submitReason ? `<div class="note-box">原因: ${history.submitReason}</div>` : ''}
-                    </div>
-                    <div class="review-col reviewer">
-                        <div class="label">核准者</div>
-                        <div class="value">${history.reviewedBy?.username || '-'}</div>
-                        <div class="date">${history.reviewedBy ? new Date(history.createdAt).toLocaleString('zh-TW') : '-'}</div>
-                        ${history.reviewNote ? `<div class="note-box">意見: ${history.reviewNote}</div>` : ''}
-                    </div>
-                    ${history.qcUser ? `
-                    <div class="review-col qc">
-                        <div class="label">QC 簽核</div>
-                        <div class="value">${history.qcUser}</div>
-                        <div class="date">${history.qcDate ? new Date(history.qcDate).toLocaleString('zh-TW') : '-'}</div>
-                        ${history.qcNote ? `<div class="note-box">意見: ${history.qcNote}</div>` : ''}
-                    </div>` : ''}
-                    ${history.pmUser ? `
-                    <div class="review-col pm">
-                        <div class="label">PM 簽核</div>
-                        <div class="value">${history.pmUser}</div>
-                        <div class="date">${history.pmDate ? new Date(history.pmDate).toLocaleString('zh-TW') : '-'}</div>
-                        ${history.pmNote ? `<div class="note-box">意見: ${history.pmNote}</div>` : ''}
-                    </div>` : ''}
-                </div>
+                <!-- Review card removed - moved to page 1 -->
+
+                ${renderReviewTimeline()}
 
                 ${renderDiffSection()}
                 
@@ -306,12 +497,62 @@ export const generateQCDocument = async (
             return currentY - 10; // Extra spacing
         };
 
-        // Submitter
-        y = drawSection('提交人員:', history.submittedBy?.username || 'N/A', history.submissionDate, '編輯意見:', history.submitReason, y);
-        y -= 10;
+        // ==========================================
+        // Draw All Review Rounds (if reviewChain exists)
+        // ==========================================
+        if (history.reviewChain && history.reviewChain.length > 0) {
+            const sortedChain = [...history.reviewChain].sort(
+                (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            );
 
-        // Approver
-        y = drawSection('核准人員:', history.reviewedBy?.username || 'N/A', history.createdAt, '審查意見:', history.reviewNote, y);
+            for (let i = 0; i < sortedChain.length; i++) {
+                const req = sortedChain[i];
+                const roundLabel = sortedChain.length > 1 ? `【第 ${i + 1} 輪】` : '';
+
+                // Check page overflow - skip if too little space (rare edge case)
+                if (y < 150) {
+                    console.warn('[generateQCDocument] Page overflow, some content may be truncated');
+                    break; // Simple handling: stop adding more rounds
+                }
+
+                // Round Header
+                if (roundLabel) {
+                    page.drawText(roundLabel, { x: margin, y, size: 11, font, color: rgb(0, 0.4, 0.5) });
+                    y -= 20;
+                }
+
+                // Submitter
+                y = drawSection(
+                    '提交人員:',
+                    req.submittedBy?.username || req.submitterName || 'N/A',
+                    new Date(req.createdAt),
+                    '編輯意見:',
+                    req.submitReason || req.submitNote,
+                    y
+                );
+                y -= 5;
+
+                // Reviewer (if approved or rejected)
+                if (req.reviewedBy || req.status === 'APPROVED' || req.status === 'REJECTED' || req.status === 'RESUBMITTED') {
+                    const reviewerName = req.reviewedBy?.username || 'N/A';
+                    const reviewStatus = req.status === 'APPROVED' ? '核准' : req.status === 'REJECTED' ? '退回' : '已處理';
+                    y = drawSection(
+                        `${reviewStatus}人員:`,
+                        reviewerName,
+                        req.updatedAt ? new Date(req.updatedAt) : null,
+                        '審查意見:',
+                        req.reviewNote,
+                        y
+                    );
+                    y -= 10;
+                }
+            }
+        } else {
+            // Fallback: Single round (original logic)
+            y = drawSection('提交人員:', history.submittedBy?.username || 'N/A', history.submissionDate, '編輯意見:', history.submitReason, y);
+            y -= 10;
+            y = drawSection('核准人員:', history.reviewedBy?.username || 'N/A', history.createdAt, '審查意見:', history.reviewNote, y);
+        }
         y -= 25;
 
         // Divider
